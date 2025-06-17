@@ -1,7 +1,3 @@
-let csvRows = [];
-let toOrderRows = [["StyleCode", "NeedToOrder"]];
-let missingInSimaRows = [["StyleCode", "AllocatedQty", "OrderedInSima"]];
-
 function readExcel(file, callback) {
     const reader = new FileReader();
     reader.onload = function (e) {
@@ -26,10 +22,10 @@ document.getElementById('uploadForm').addEventListener('submit', function (e) {
         return;
     }
 
-    readExcel(allocFile, allocData => {
-        readExcel(orderFile, orderData => {
+    readExcel(orderFile, orderData => {
+        readExcel(allocFile, allocData => {
             readExcel(pendingFile, pendingData => {
-                generateReport(allocData, orderData, pendingData);
+                generateReport(orderData, allocData, pendingData);
             });
         });
     });
@@ -47,64 +43,61 @@ function sumByStyleCode(data, qtyField) {
     return summed;
 }
 
-function generateReport(allocRaw, orderRaw, pendingRaw) {
-    // Reset globals
-    csvRows = [["StyleCode", "NeedToOrder"]];
-    toOrderRows = [["StyleCode", "NeedToOrder"]];
-    missingInSimaRows = [["StyleCode", "AllocatedQty", "OrderedInSima"]];
-
-    const allocSum = sumByStyleCode(allocRaw, "AllocatedQty");
-    const pendingSum = sumByStyleCode(pendingRaw, "PendingQty");
+function generateReport(orderRaw, allocRaw, pendingRaw) {
     const orderMap = {};
     orderRaw.forEach(item => {
         const code = item.StyleCode?.trim();
         orderMap[code] = parseInt(item.OrderedQty) || 0;
     });
 
-    const styleCodes = new Set([
-        ...Object.keys(pendingSum),
+    const allocSum = sumByStyleCode(allocRaw, "AllocatedQty");
+    const pendingSum = sumByStyleCode(pendingRaw, "PendingQty");
+
+    const allCodes = new Set([
+        ...Object.keys(orderMap),
         ...Object.keys(allocSum),
-        ...Object.keys(orderMap)
+        ...Object.keys(pendingSum)
     ]);
 
+    const finalData = [["StyleCode", "OrderedQty", "AllocatedQty", "PendingQty", "AddToSimaQty", "OrderFromKeringQty"]];
     const table = document.getElementById("reportTable");
-    table.innerHTML = "<tr><th>StyleCode</th><th>NeedToOrder</th></tr>";
+    table.innerHTML = "<tr><th>StyleCode</th><th>OrderedQty</th><th>AllocatedQty</th><th>PendingQty</th><th>AddToSimaQty</th><th>OrderFromKeringQty</th></tr>";
 
-    styleCodes.forEach(code => {
-        const pending = pendingSum[code] || 0;
-        const allocated = allocSum[code] || 0;
+    allCodes.forEach(code => {
         const ordered = orderMap[code] || 0;
+        const allocated = allocSum[code] || 0;
+        const pending = pendingSum[code] || 0;
 
-        const toOrder = pending - allocated - ordered;
-        if (toOrder > 0) {
-            toOrderRows.push([code, toOrder]);
-            csvRows.push([code, toOrder]);
-            table.innerHTML += `<tr><td>${code}</td><td>${toOrder}</td></tr>`;
-        }
+        const addToSima = Math.max(allocated - ordered, 0);
+        const orderFromKering = Math.max(pending - allocated - ordered, 0);
 
-        if (allocated > 0 && ordered < allocated) {
-            missingInSimaRows.push([code, allocated, ordered]);
+        if (addToSima > 0 || orderFromKering > 0) {
+            finalData.push([code, ordered, allocated, pending, addToSima, orderFromKering]);
+            table.innerHTML += `<tr>
+                <td>${code}</td><td>${ordered}</td><td>${allocated}</td><td>${pending}</td>
+                <td>${addToSima}</td><td>${orderFromKering}</td>
+            </tr>`;
         }
     });
 
     document.getElementById("reportSection").style.display = 'block';
+
+    // Excel download
+    document.getElementById("downloadExcelBtn").onclick = () => {
+        const wb = XLSX.utils.book_new();
+        const ws = XLSX.utils.aoa_to_sheet(finalData);
+        XLSX.utils.book_append_sheet(wb, ws, "Ordering Report");
+        XLSX.writeFile(wb, "kering_order_report.xlsx");
+    };
+
+    // CSV download
+    document.getElementById("downloadBtn").onclick = () => {
+        const csvContent = finalData.map(e => e.join(",")).join("\\n");
+        const blob = new Blob([csvContent], { type: "text/csv" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "kering_order_report.csv";
+        a.click();
+    };
 }
-
-document.getElementById("downloadBtn").onclick = () => {
-    const csvContent = csvRows.map(e => e.join(",")).join("\\n");
-    const blob = new Blob([csvContent], { type: "text/csv" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "kering_to_order.csv";
-    a.click();
-};
-
-document.getElementById("downloadExcelBtn").onclick = () => {
-    const wb = XLSX.utils.book_new();
-    const ws1 = XLSX.utils.aoa_to_sheet(toOrderRows);
-    const ws2 = XLSX.utils.aoa_to_sheet(missingInSimaRows);
-    XLSX.utils.book_append_sheet(wb, ws1, "To Order from Kering");
-    XLSX.utils.book_append_sheet(wb, ws2, "Missing in Sima System");
-    XLSX.writeFile(wb, "kering_order_report.xlsx");
-};
