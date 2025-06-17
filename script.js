@@ -22,13 +22,22 @@ document.getElementById('uploadForm').addEventListener('submit', function (e) {
         return;
     }
 
-    readExcel(orderFile, orderData => {
-        readExcel(allocFile, allocData => {
-            readExcel(pendingFile, pendingData => {
-                generateReport(orderData, allocData, pendingData);
+    document.getElementById("progressBarWrapper").style.display = "block";
+    document.getElementById("reportSection").style.display = "none";
+    document.getElementById("progressBar").style.width = "0%";
+
+    setTimeout(() => {
+        readExcel(orderFile, orderData => {
+            document.getElementById("progressBar").style.width = "25%";
+            readExcel(allocFile, allocData => {
+                document.getElementById("progressBar").style.width = "50%";
+                readExcel(pendingFile, pendingData => {
+                    document.getElementById("progressBar").style.width = "75%";
+                    generateReport(orderData, allocData, pendingData);
+                });
             });
         });
-    });
+    }, 100);
 });
 
 function sumByStyleCode(data, qtyField) {
@@ -47,7 +56,8 @@ function generateReport(orderRaw, allocRaw, pendingRaw) {
     const orderMap = {};
     orderRaw.forEach(item => {
         const code = item.StyleCode?.trim();
-        orderMap[code] = parseInt(item.OrderedQty) || 0;
+        const qty = parseInt(item.OrderedQty) || 0;
+        if (code) orderMap[code] = qty;
     });
 
     const allocSum = sumByStyleCode(allocRaw, "AllocatedQty");
@@ -81,8 +91,14 @@ function generateReport(orderRaw, allocRaw, pendingRaw) {
     });
 
     document.getElementById("reportSection").style.display = 'block';
+    document.getElementById("progressBar").style.width = "100%";
 
-    // Excel download
+    setTimeout(() => {
+        document.getElementById("progressBarWrapper").style.display = "none";
+        document.getElementById("progressBar").style.width = "0%";
+    }, 500);
+
+    // Download Excel
     document.getElementById("downloadExcelBtn").onclick = () => {
         const wb = XLSX.utils.book_new();
         const ws = XLSX.utils.aoa_to_sheet(finalData);
@@ -90,7 +106,7 @@ function generateReport(orderRaw, allocRaw, pendingRaw) {
         XLSX.writeFile(wb, "kering_order_report.xlsx");
     };
 
-    // CSV download
+    // Download CSV
     document.getElementById("downloadBtn").onclick = () => {
         const csvContent = finalData.map(e => e.join(",")).join("\\n");
         const blob = new Blob([csvContent], { type: "text/csv" });
