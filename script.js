@@ -46,7 +46,6 @@ document.getElementById('uploadForm').addEventListener('submit', function (e) {
               progressBar.style.width = "80%";
               pendingData = data3;
 
-              // Now generate report in background
               setTimeout(() => {
                 generateReport(orderData, allocData, pendingData, () => {
                   progressBar.style.width = "100%";
@@ -97,62 +96,47 @@ function generateReport(orderRaw, allocRaw, pendingRaw, doneCallback) {
   const finalData = [["StyleCode", "OrderedQty", "AllocatedQty", "PendingQty", "AddToSimaQty", "OrderFromKeringQty"]];
   let htmlRows = "";
 
-  let processed = 0;
-  const codes = Array.from(allCodes);
-  const batchSize = 1000;
+  for (const code of allCodes) {
+    const ordered = orderMap.get(code) || 0;
+    const allocated = allocMap.get(code) || 0;
+    const pending = pendingMap.get(code) || 0;
 
-  function processBatch() {
-    const slice = codes.slice(processed, processed + batchSize);
-    slice.forEach(code => {
-      const ordered = orderMap.get(code) || 0;
-      const allocated = allocMap.get(code) || 0;
-      const pending = pendingMap.get(code) || 0;
+    const addToSima = Math.max(allocated - ordered, 0);
+    const orderFromKering = Math.max(pending - allocated - ordered, 0);
 
-      const addToSima = Math.max(allocated - ordered, 0);
-      const orderFromKering = Math.max(pending - allocated - ordered, 0);
-
-      if (addToSima > 0 || orderFromKering > 0) {
-        finalData.push([code, ordered, allocated, pending, addToSima, orderFromKering]);
-        htmlRows += `<tr>
-          <td>${code}</td><td>${ordered}</td><td>${allocated}</td><td>${pending}</td>
-          <td>${addToSima}</td><td>${orderFromKering}</td>
-        </tr>`;
-      }
-    });
-
-    processed += batchSize;
-    if (processed < codes.length) {
-      setTimeout(processBatch, 0); // allow UI update
-    } else {
-      const table = document.getElementById("reportTable");
-      table.innerHTML = `<tr>
-        <th>StyleCode</th><th>OrderedQty</th><th>AllocatedQty</th><th>PendingQty</th>
-        <th>AddToSimaQty</th><th>OrderFromKeringQty</th>
-      </tr>` + htmlRows;
-
-      document.getElementById("reportSection").style.display = 'block';
-
-      document.getElementById("downloadExcelBtn").onclick = () => {
-        const wb = XLSX.utils.book_new();
-        const ws = XLSX.utils.aoa_to_sheet(finalData);
-        XLSX.utils.book_append_sheet(wb, ws, "Ordering Report");
-        XLSX.writeFile(wb, "kering_order_report.xlsx");
-      };
-
-      document.getElementById("downloadBtn").onclick = () => {
-        const csvContent = finalData.map(e => e.join(",")).join("\\n");
-        const blob = new Blob([csvContent], { type: "text/csv" });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = "kering_order_report.csv";
-        a.click();
-      };
-
-      if (doneCallback) doneCallback();
+    if (addToSima > 0 || orderFromKering > 0) {
+      finalData.push([code, ordered, allocated, pending, addToSima, orderFromKering]);
+      htmlRows += `<tr>
+        <td>${code}</td><td>${ordered}</td><td>${allocated}</td><td>${pending}</td>
+        <td>${addToSima}</td><td>${orderFromKering}</td>
+      </tr>`;
     }
   }
 
-  // Kick off first batch
-  processBatch();
+  const table = document.getElementById("reportTable");
+  table.innerHTML = `<tr>
+    <th>StyleCode</th><th>OrderedQty</th><th>AllocatedQty</th><th>PendingQty</th>
+    <th>AddToSimaQty</th><th>OrderFromKeringQty</th>
+  </tr>` + htmlRows;
+
+  document.getElementById("reportSection").style.display = 'block';
+
+  document.getElementById("downloadExcelBtn").onclick = () => {
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.aoa_to_sheet(finalData);
+    XLSX.utils.book_append_sheet(wb, ws, "Ordering Report");
+    XLSX.writeFile(wb, "kering_order_report.xlsx");
+  };
+
+  document.getElementById("downloadBtn").onclick = () => {
+    const csvContent = finalData.map(e => e.join(",")).join("\n");
+    const blob = new Blob([csvContent], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "kering_order_report.csv";
+    a.click();
+  };
+
+  if (doneCallback) doneCallback();
 }
