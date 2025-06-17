@@ -83,3 +83,10 @@ function generateReport(allocData, orderData, pendingData) {
         a.click();
     };
 }
+
+    document.getElementById('downloadExcelBtn').onclick = () => {
+        const wb = XLSX.utils.book_new();
+        const ws = XLSX.utils.aoa_to_sheet(csvRows);
+        XLSX.utils.book_append_sheet(wb, ws, "OrderReport");
+        XLSX.writeFile(wb, "kering_eyewear_order_report.xlsx");
+    };
