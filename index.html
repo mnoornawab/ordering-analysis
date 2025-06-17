@@ -2,18 +2,22 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Stock Ordering System (Excel)</title>
+    <title>SIMA Eyewear Stock Ordering System (Excel)</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <h1>Stock Ordering System</h1>
+    <div class="header">
+        <img src="logo.png" alt="Logo" class="logo">
+        <h1>Stock Ordering System</h1>
+    </div>
+
     <p>Upload the three required Excel (.xlsx) files:</p>
 
     <h3>Download Sample Templates:</h3>
     <ul>
-        <li><a href="Kering Eyewear Allocation File.xlsx">Kering Eyewear Allocation File</a></li>
-        <li><a href="Sima Eyewear Pending Order File.xlsx">Sima Eyewear Pending Order File</a></li>
-        <li><a href="Sima Eyewear Quantity on Order File.xlsx">Sima Eyewear Quantity on Order File</a></li>
+        <li><a href="Kering Eyewear Allocation File.xlsx" download>Kering Eyewear Allocation File</a></li>
+        <li><a href="Sima Eyewear Pending Order File.xlsx" download>Sima Eyewear Pending Order File</a></li>
+        <li><a href="Sima Eyewear Quantity on Order File.xlsx" download>Sima Eyewear Quantity on Order File</a></li>
     </ul>
 
     <form id="uploadForm">
@@ -26,7 +30,8 @@
     <div id="reportSection" style="display:none;">
         <h2>Order Requirement Report</h2>
         <table id="reportTable" border="1"></table>
-        <button id="downloadBtn">Download CSV</button>
+        <button id="downloadBtn">Download as CSV</button>
+        <button id="downloadExcelBtn">Download as Excel</button>
     </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
