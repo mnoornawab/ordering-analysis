@@ -24,13 +24,13 @@ function processFile() {
 
     const itemMap = {};
 
-    // Load SIMA sheet
+    // STEP 1: Load base SIMA file
     simaData.forEach(row => {
       const itemCode = row['Item Code']?.toString().trim();
-      const styleCode = row['Style Code']?.toString().trim();
+      const styleCode = row['Style Code']?.toString().trim(); // 🟢 From Column G
       const qtyOnOrder = parseInt(row['Qty On Order']) || 0;
 
-      if (itemCode && itemCode !== 'undefined') {
+      if (itemCode) {
         itemMap[itemCode] = {
           itemCode,
           styleCode,
@@ -41,19 +41,19 @@ function processFile() {
       }
     });
 
-    // Load Allocation File by Style Code
+    // STEP 2: Match Allocation File by Style Code
     allocData.forEach(row => {
-      const styleCodeAlloc = row['Material code']?.toString().trim();
-      const qtyAlloc = parseInt(row['Pending order qty']) || 0;
+      const allocStyle = row['Material code']?.toString().trim();
+      const allocQty = parseInt(row['Pending order qty']) || 0;
 
-      Object.values(itemMap).forEach(item => {
-        if (item.styleCode === styleCodeAlloc) {
-          item.qtyAllocated += qtyAlloc;
+      for (const code in itemMap) {
+        if (itemMap[code].styleCode === allocStyle) {
+          itemMap[code].qtyAllocated += allocQty;
         }
-      });
+      }
     });
 
-    // Load Orders sheet by Item Code
+    // STEP 3: Match Orders-SIMA File by Item Code
     ordersData.forEach(row => {
       const itemCode = row['ITEMCODE']?.toString().trim();
       const balance = parseInt(row['BALANCE']) || 0;
@@ -65,10 +65,8 @@ function processFile() {
 
     const finalData = Object.values(itemMap);
 
-    // Save for rendering
+    // Pass to render script
     window.processedData = finalData;
-
-    // Render
     document.getElementById('main-report').innerHTML = generateMainTable(finalData);
     document.getElementById('mismatch-report').innerHTML = generateMismatchTable(finalData);
     document.getElementById('to-order-report').innerHTML = generateToOrderTable(finalData);
