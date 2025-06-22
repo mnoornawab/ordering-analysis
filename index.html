@@ -12,28 +12,20 @@
     <h1>📦 Stock Ordering System</h1>
 
     <input type="file" id="file-input" accept=".xlsx" />
-    <button onclick="processFile()">Upload & Analyze</button>
     <div id="status"></div>
 
     <div class="tabs">
       <button class="tab-button active" onclick="openTab('main')">Main Report</button>
-      <button class="tab-button" onclick="openTab('mismatch')">Mismatch Report</button>
       <button class="tab-button" onclick="openTab('to-order')">To Order Report</button>
     </div>
 
     <div id="main" class="tab-content active-tab">
-      <h3>📊 Main Report</h3>
-      <label><input type="checkbox" id="hide-zero" onchange="toggleZeroRows(this)"> Hide rows with all 0 values</label>
+      <h3>📄 Main Report</h3>
       <div id="main-report"></div>
     </div>
 
-    <div id="mismatch" class="tab-content">
-      <h3>⚠️ Mismatch Report</h3>
-      <div id="mismatch-report"></div>
-    </div>
-
     <div id="to-order" class="tab-content">
-      <h3>📦 To Order Report</h3>
+      <h3>📄 To Order Report</h3>
       <div id="to-order-report"></div>
     </div>
   </div>
@@ -41,5 +33,13 @@
   <script src="libs/xlsx.full.min.js"></script>
   <script src="js/script-load.js"></script>
   <script src="js/script-render.js"></script>
+  <script>
+    function openTab(tabName) {
+      document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active-tab'));
+      document.querySelectorAll('.tab-button').forEach(b => b.classList.remove('active'));
+      document.getElementById(tabName).classList.add('active-tab');
+      event.currentTarget.classList.add('active');
+    }
+  </script>
 </body>
 </html>
