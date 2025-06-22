@@ -1,61 +1,72 @@
 body {
   font-family: Arial, sans-serif;
-  padding: 2rem;
   background: #f7f9fc;
   margin: 0;
+  padding: 20px;
+  color: #333;
 }
 
 .container {
-  max-width: 1000px;
+  max-width: 1200px;
   margin: auto;
   background: white;
-  padding: 2rem;
-  border-radius: 10px;
-  box-shadow: 0 0 10px #ccc;
+  padding: 30px;
+  border-radius: 8px;
+  box-shadow: 0 0 10px rgba(0,0,0,0.05);
 }
 
-input, button {
-  margin: 1rem 0;
-  padding: 10px 14px;
-  font-size: 16px;
-  border-radius: 5px;
-  border: 1px solid #ccc;
+h1 {
+  text-align: center;
+  margin-bottom: 30px;
+  color: #2c3e50;
+}
+
+input[type="file"] {
+  display: block;
+  margin: 0 auto 20px auto;
 }
 
 button {
-  cursor: pointer;
-  background-color: #4CAF50;
+  background: #3498db;
   color: white;
   border: none;
+  padding: 10px 20px;
+  font-size: 15px;
+  cursor: pointer;
+  border-radius: 4px;
+  margin: 10px 0;
 }
 
 button:hover {
-  background-color: #45a049;
+  background: #2980b9;
 }
 
 .tabs {
+  display: flex;
+  justify-content: center;
   margin-top: 20px;
 }
 
 .tab-button {
-  background-color: #e9ecef;
+  background: #ecf0f1;
   border: none;
-  padding: 10px 20px;
-  margin-right: 10px;
-  font-size: 16px;
+  padding: 10px 15px;
+  margin: 0 5px;
   cursor: pointer;
-  border-radius: 5px 5px 0 0;
+  border-radius: 4px 4px 0 0;
+  font-weight: bold;
 }
 
 .tab-button.active {
-  background-color: #dee2e6;
-  font-weight: bold;
+  background: #ffffff;
+  border-bottom: 2px solid #3498db;
 }
 
 .tab-content {
   display: none;
-  padding: 20px 0;
-  border-top: 2px solid #ccc;
+  padding: 20px;
+  border: 1px solid #ddd;
+  border-top: none;
 }
 
 .tab-content.active-tab {
@@ -65,24 +76,31 @@ button:hover {
 table {
   width: 100%;
   border-collapse: collapse;
-  margin-top: 1rem;
+  margin-top: 20px;
+}
+
+table, th, td {
+  border: 1px solid #ccc;
 }
 
 th, td {
-  border: 1px solid #ddd;
-  padding: 8px;
-  font-size: 14px;
-  text-align: left;
+  padding: 8px 12px;
+  text-align: center;
 }
 
 th {
-  background-color: #f2f2f2;
+  background-color: #f0f4f8;
+  font-weight: bold;
 }
 
-tr.highlight-missing {
-  background-color: #ffe6e6; /* light red */
+tr:nth-child(even) {
+  background-color: #fafafa;
 }
 
-tr.highlight-to-order {
-  background-color: #fff9cc; /* light yellow */
+tr:hover {
+  background-color: #f1f1f1;
+}
+
+button + button {
+  margin-left: 10px;
 }
