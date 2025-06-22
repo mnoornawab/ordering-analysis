@@ -2,7 +2,6 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Stock Ordering System</title>
   <link rel="stylesheet" href="style.css" />
 </head>
@@ -14,10 +13,17 @@
     <button onclick="processFile()">Upload & Analyze</button>
     <div id="status"></div>
 
-    <div id="main-report"></div>
+    <div id="tab-buttons">
+      <button onclick="showTab('main-report')">📋 Full Report</button>
+      <button onclick="showTab('mismatch-report')">⚠️ Mismatch Report</button>
+    </div>
+
+    <div id="main-report" class="report-tab"></div>
+    <div id="mismatch-report" class="report-tab" style="display:none;"></div>
   </div>
 
   <script src="libs/xlsx.full.min.js"></script>
-  <script src="script-load.js"></script>
+  <script src="js/script-render.js"></script>
+  <script src="js/script-load.js"></script>
 </body>
 </html>
