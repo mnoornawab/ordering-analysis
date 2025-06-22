@@ -2,7 +2,6 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Stock Ordering System</title>
   <link rel="stylesheet" href="style.css" />
 </head>
@@ -14,23 +13,7 @@
     <button onclick="processFile()">Upload & Analyze</button>
     <div id="status"></div>
 
-    <div class="tabs">
-      <button class="tab-button active" onclick="openTab('mismatch')">Mismatch Report</button>
-      <button class="tab-button" onclick="openTab('to-order')">To Order Report</button>
-    </div>
-
-    <div id="mismatch" class="tab-content active-tab">
-      <h3>📄 Mismatch Report: SIMA vs Allocation</h3>
-      <div id="mismatch-table"></div>
-    </div>
-
-    <div id="to-order" class="tab-content">
-      <h3>📄 To Order Report: Balance vs Allocation</h3>
-      <button id="filter-btn" onclick="toggleFilter()" style="display:none;">Show Only To Order</button>
-      <div id="order-table"></div>
-    </div>
-
-    <button id="download-btn" style="display:none;" onclick="downloadCSV()">Download Excel Report</button>
+    <div id="report"></div>
   </div>
 
   <script src="libs/xlsx.full.min.js"></script>
