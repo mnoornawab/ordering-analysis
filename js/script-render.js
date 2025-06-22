@@ -1,7 +1,11 @@
 function generateMainTable(data) {
   let html = `<label><input type="checkbox" id="hide-zero" onchange="toggleZeroRows(this)"> Hide rows with all 0 values</label>`;
   html += `<table><thead><tr>
-    <th>Item Code</th><th>Style Code</th><th>Qty On Order</th><th>On Allocation File</th><th>Balance from Orders</th>
+    <th>Item Code</th>
+    <th>Style Code</th>
+    <th>Qty On Order</th>
+    <th>On Allocation File</th>
+    <th>Balance from Orders</th>
   </tr></thead><tbody>`;
 
   let totalOrder = 0;
