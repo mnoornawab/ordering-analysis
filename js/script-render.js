@@ -38,6 +38,9 @@ let analyzedData = [];
 let allocationMap = {};
 let ordersMap = {};
 let styleMap = {};
+let qtyData = [];
+let allocData = [];
+let ordersData = [];
 
 function analyzeFile() {
     const fileInput = document.getElementById('excelFile');
@@ -60,9 +63,9 @@ function analyzeFile() {
             return;
         }
 
-        const qtyData = XLSX.utils.sheet_to_json(qtySheet);
-        const allocData = XLSX.utils.sheet_to_json(allocSheet);
-        const ordersData = XLSX.utils.sheet_to_json(ordersSheet);
+        qtyData = XLSX.utils.sheet_to_json(qtySheet);
+        allocData = XLSX.utils.sheet_to_json(allocSheet);
+        ordersData = XLSX.utils.sheet_to_json(ordersSheet);
 
         // Allocation Map: sum by Item Code
         allocationMap = {};
@@ -110,7 +113,7 @@ function analyzeFile() {
         });
 
         renderMainReport(analyzedData);
-        renderMismatchReport(analyzedData);
+        renderMismatchReport();
         renderToOrderReport(analyzedData);
 
         switchTab('main');
@@ -182,34 +185,60 @@ function renderMainReport(data) {
         .map(k => k + ": " + totals[k]).join(" | ");
 }
 
-function renderMismatchReport(data) {
+function renderMismatchReport() {
     const container = document.getElementById("mismatchResults");
     const totalsDiv = document.getElementById("mismatchTotals");
-    const mismatches = data.filter(row => row["Qty on Order"] !== row["On Allocation File"]);
-    if (mismatches.length === 0) {
+    if (!qtyData || !allocData) {
+        container.innerHTML = "<p>No data found.</p>";
+        totalsDiv.innerHTML = "";
+        return;
+    }
+
+    // Pivot Allocation File: sum by Item Code
+    const allocSum = {};
+    allocData.forEach(row => {
+        const code = getColumnValue(row, ["Item Code"]);
+        const qty = Number(getColumnValue(row, ["Pending Order Qty", "Pending order qty"]) || 0);
+        allocSum[code] = (allocSum[code] || 0) + qty;
+    });
+
+    // Main mismatch: ALL codes in Sheet 1
+    const mismatchRows = qtyData
+        .map(row => {
+            const code = getColumnValue(row, ["Item Code"]);
+            const style = getColumnValue(row, ["Style", "Style Code"]) || "";
+            const qtyOnOrder = Number(getColumnValue(row, ["Qty on Order", "Qty On Order", "Qty on order"]) || 0);
+            const allocQty = allocSum[code] || 0;
+            return {
+                "Item Code": code,
+                "Style Code": style,
+                "Qty on Order": qtyOnOrder,
+                "On Allocation File": allocQty,
+                "Mismatch Note": qtyOnOrder !== allocQty
+                    ? `Qty on Order (${qtyOnOrder}) ≠ On Allocation File (${allocQty})`
+                    : ""
+            };
+        })
+        .filter(row => row["Qty on Order"] !== row["On Allocation File"]);
+
+    if (mismatchRows.length === 0) {
         container.innerHTML = "<p>No mismatches found.</p>";
         totalsDiv.innerHTML = "";
         return;
     }
+
     const headers = ["Item Code", "Style Code", "Qty on Order", "On Allocation File", "Mismatch Note"];
     let html = "<table><thead><tr>";
     headers.forEach(h => html += `<th>${h}</th>`);
     html += "</tr></thead><tbody>";
-    mismatches.forEach(row => {
-        let note = "";
-        if (row["Qty on Order"] !== row["On Allocation File"]) {
-            note = `Qty on Order (${row["Qty on Order"]}) ≠ On Allocation File (${row["On Allocation File"]})`;
-        }
+    mismatchRows.forEach(row => {
         html += "<tr>";
-        headers.forEach(h => {
-            if (h === "Mismatch Note") html += `<td>${note}</td>`;
-            else html += `<td>${row[h]}</td>`;
-        });
+        headers.forEach(h => html += `<td>${row[h]}</td>`);
         html += "</tr>";
     });
 
     // Totals row
-    const totals = calculateTotals(mismatches, ["Qty on Order", "On Allocation File"]);
+    const totals = calculateTotals(mismatchRows, ["Qty on Order", "On Allocation File"]);
     html += "<tr style='font-weight: bold; background: #eaf2fb;'>";
     headers.forEach(h => {
         if (h === "Item Code") html += "<td>TOTAL</td>";
@@ -270,18 +299,30 @@ function exportReport(type) {
         filename = "Stock_Order_Main_Report.xlsx";
     } else if (type === 'mismatch') {
         headers = ["Item Code", "Style Code", "Qty on Order", "On Allocation File", "Mismatch Note"];
-        rows = analyzedData
-          .filter(r => r["Qty on Order"] !== r["On Allocation File"])
-          .map(r => {
-              let note = `Qty on Order (${r["Qty on Order"]}) ≠ On Allocation File (${r["On Allocation File"]})`;
-              return {
-                  "Item Code": r["Item Code"],
-                  "Style Code": r["Style Code"],
-                  "Qty on Order": r["Qty on Order"],
-                  "On Allocation File": r["On Allocation File"],
-                  "Mismatch Note": note
-              };
-          });
+        // Use the same logic as renderMismatchReport
+        const allocSum = {};
+        allocData.forEach(row => {
+            const code = getColumnValue(row, ["Item Code"]);
+            const qty = Number(getColumnValue(row, ["Pending Order Qty", "Pending order qty"]) || 0);
+            allocSum[code] = (allocSum[code] || 0) + qty;
+        });
+        rows = qtyData
+            .map(row => {
+                const code = getColumnValue(row, ["Item Code"]);
+                const style = getColumnValue(row, ["Style", "Style Code"]) || "";
+                const qtyOnOrder = Number(getColumnValue(row, ["Qty on Order", "Qty On Order", "Qty on order"]) || 0);
+                const allocQty = allocSum[code] || 0;
+                return {
+                    "Item Code": code,
+                    "Style Code": style,
+                    "Qty on Order": qtyOnOrder,
+                    "On Allocation File": allocQty,
+                    "Mismatch Note": qtyOnOrder !== allocQty
+                        ? `Qty on Order (${qtyOnOrder}) ≠ On Allocation File (${allocQty})`
+                        : ""
+                };
+            })
+            .filter(row => row["Qty on Order"] !== row["On Allocation File"]);
         filename = "Stock_Order_Mismatch_Report.xlsx";
     } else if (type === 'toorder') {
         headers = ["Item Code", "Style Code", "On Allocation File", "Balance from Orders"];
@@ -331,18 +372,30 @@ function exportAllReports() {
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(mainRows), "Main Report");
     // Mismatch
     let mismatchHeaders = ["Item Code", "Style Code", "Qty on Order", "On Allocation File", "Mismatch Note"];
-    let mismatchRows = analyzedData
-      .filter(r => r["Qty on Order"] !== r["On Allocation File"])
-      .map(r => {
-          let note = `Qty on Order (${r["Qty on Order"]}) ≠ On Allocation File (${r["On Allocation File"]})`;
-          return {
-              "Item Code": r["Item Code"],
-              "Style Code": r["Style Code"],
-              "Qty on Order": r["Qty on Order"],
-              "On Allocation File": r["On Allocation File"],
-              "Mismatch Note": note
-          };
-      });
+    // Same logic as renderMismatchReport
+    const allocSum = {};
+    allocData.forEach(row => {
+        const code = getColumnValue(row, ["Item Code"]);
+        const qty = Number(getColumnValue(row, ["Pending Order Qty", "Pending order qty"]) || 0);
+        allocSum[code] = (allocSum[code] || 0) + qty;
+    });
+    let mismatchRows = qtyData
+        .map(row => {
+            const code = getColumnValue(row, ["Item Code"]);
+            const style = getColumnValue(row, ["Style", "Style Code"]) || "";
+            const qtyOnOrder = Number(getColumnValue(row, ["Qty on Order", "Qty On Order", "Qty on order"]) || 0);
+            const allocQty = allocSum[code] || 0;
+            return {
+                "Item Code": code,
+                "Style Code": style,
+                "Qty on Order": qtyOnOrder,
+                "On Allocation File": allocQty,
+                "Mismatch Note": qtyOnOrder !== allocQty
+                    ? `Qty on Order (${qtyOnOrder}) ≠ On Allocation File (${allocQty})`
+                    : ""
+            };
+        })
+        .filter(row => row["Qty on Order"] !== row["On Allocation File"]);
     let mismatchTotals = calculateTotals(mismatchRows, ["Qty on Order", "On Allocation File"]);
     let mismatchTotalsRow = {};
     mismatchHeaders.forEach(h => {
