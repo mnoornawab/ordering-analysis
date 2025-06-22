@@ -7,9 +7,8 @@ function downloadTemplate() {
         ],
         "Allocation File": [
             ['Item Code', 'Pending Order Qty'],
-            ['ABC123', 90],
-            ['ABC123', 10],
-            ['DEF456', 180]
+            ['ABC123', 100],
+            ['DEF456', 200]
         ],
         "Orders-SIMA System": [
             ['Item Code', 'Style', 'BALANCE'],
@@ -83,11 +82,16 @@ function analyzeFile() {
             ordersMap[item] = (ordersMap[item] || 0) + qty;
         });
 
-        // ---- Build Main Data: All Item Codes from Qty on Order ----
-        analyzedData = qtyData.map(row => {
-            const item = row["Item Code"];
+        // ---- Build set of all Item Codes (union of Qty on Order and Allocation File) ----
+        const allItemCodes = new Set();
+        qtyData.forEach(row => { if (row["Item Code"]) allItemCodes.add(row["Item Code"]); });
+        allocData.forEach(row => { if (row["Item Code"]) allItemCodes.add(row["Item Code"]); });
+
+        // ---- Build Main Data: All unique Item Codes ----
+        analyzedData = Array.from(allItemCodes).map(item => {
+            const qtyRow = qtyData.find(row => row["Item Code"] === item);
             const style = styleMap[item] || "";
-            const qtyOnOrder = Number(row["Qty on Order"] || 0);
+            const qtyOnOrder = qtyRow ? Number(qtyRow["Qty on Order"] || 0) : 0;
             return {
                 "Item Code": item,
                 "Style Code": style,
