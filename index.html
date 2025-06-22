@@ -19,18 +19,18 @@
       <button class="tab-button" onclick="openTab('to-order')">To Order Report</button>
     </div>
 
-  <div id="mismatch" class="tab-content active-tab">
-  <h3>📄 Mismatch Report: SIMA vs Allocation</h3>
-  <div id="mismatch-table"></div> <!-- MUST EXIST -->
-</div>
+    <div id="mismatch" class="tab-content active-tab">
+      <h3>📄 Mismatch Report: SIMA vs Allocation</h3>
+      <div id="mismatch-table"></div>
+    </div>
 
-<div id="to-order" class="tab-content">
-  <h3>📄 To Order Report: Balance vs Allocation</h3>
-  <div id="order-table"></div> <!-- MUST EXIST -->
-</div>
+    <div id="to-order" class="tab-content">
+      <h3>📄 To Order Report: Balance vs Allocation</h3>
+      <button id="filter-btn" onclick="toggleFilter()" style="display:none;">Show Only To Order</button>
+      <div id="order-table"></div>
+    </div>
 
-
-    <button id="download-btn" style="display:none;" onclick="downloadCSV()">Download CSV</button>
+    <button id="download-btn" style="display:none;" onclick="downloadCSV()">Download Excel Report</button>
   </div>
 
   <script src="libs/xlsx.full.min.js"></script>
