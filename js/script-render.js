@@ -1,4 +1,3 @@
-// Helper for robust, case-insensitive column lookup
 function getColumnValue(row, possibleHeaders) {
     for (const header of possibleHeaders) {
         if (header in row) return row[header];
@@ -51,7 +50,6 @@ function analyzeFile() {
         const data = new Uint8Array(e.target.result);
         const workbook = XLSX.read(data, { type: 'array' });
 
-        // ---- Load and normalize all sheets ----
         const qtySheet = workbook.Sheets["Quantity on Order - SIMA System"];
         const allocSheet = workbook.Sheets["Allocation File"];
         const ordersSheet = workbook.Sheets["Orders-SIMA System"];
@@ -64,7 +62,7 @@ function analyzeFile() {
         const allocData = XLSX.utils.sheet_to_json(allocSheet);
         const ordersData = XLSX.utils.sheet_to_json(ordersSheet);
 
-        // ---- Build Style Map from Qty on Order and Orders sheets ----
+        // Style map
         styleMap = {};
         qtyData.forEach(row => {
             const code = getColumnValue(row, ["Item Code"]);
@@ -77,7 +75,7 @@ function analyzeFile() {
             if (code && style && !styleMap[code]) styleMap[code] = style;
         });
 
-        // ---- Build Allocation Map (sum by Item Code) ----
+        // Allocation Map
         allocationMap = {};
         allocData.forEach(row => {
             const item = getColumnValue(row, ["Item Code"]);
@@ -86,7 +84,7 @@ function analyzeFile() {
             allocationMap[item] = (allocationMap[item] || 0) + qty;
         });
 
-        // ---- Build Orders Map (sum by Item Code) ----
+        // Orders Map
         ordersMap = {};
         ordersData.forEach(row => {
             const item = getColumnValue(row, ["Item Code"]);
@@ -95,12 +93,12 @@ function analyzeFile() {
             ordersMap[item] = (ordersMap[item] || 0) + (qty || 0);
         });
 
-        // ---- Build set of all Item Codes (union of Qty on Order and Allocation File) ----
+        // All unique Item Codes
         const allItemCodes = new Set();
         qtyData.forEach(row => { const code = getColumnValue(row, ["Item Code"]); if (code) allItemCodes.add(code); });
         allocData.forEach(row => { const code = getColumnValue(row, ["Item Code"]); if (code) allItemCodes.add(code); });
 
-        // ---- Build Main Data: All unique Item Codes ----
+        // Main Data
         analyzedData = Array.from(allItemCodes).map(item => {
             const qtyRow = qtyData.find(row => getColumnValue(row, ["Item Code"]) === item);
             const style = styleMap[item] || "";
@@ -121,7 +119,6 @@ function analyzeFile() {
         renderMismatchReport(analyzedData);
         renderToOrderReport(analyzedData);
 
-        // Show main tab by default
         switchTab('main');
     };
     reader.readAsArrayBuffer(file);
@@ -135,7 +132,6 @@ function renderMainReport(data) {
         return;
     }
 
-    // Filtered view (show only those needing to order more if checkbox is checked)
     const showToOrder = document.getElementById("filterCheckbox").checked;
     const filtered = showToOrder ? data.filter(row => row["Balance from Orders"] > row["On Allocation File"]) : data;
 
@@ -148,22 +144,34 @@ function renderMainReport(data) {
         headers.forEach(h => html += `<td>${row[h]}</td>`);
         html += "</tr>";
     });
+    // Totals row
+    const totals = calculateTotals(filtered, ["Qty on Order", "On Allocation File", "Balance from Orders"]);
+    html += "<tr style='font-weight: bold; background: #eaf2fb;'>";
+    headers.forEach(h => {
+        if (h === "Item Code") html += "<td>TOTAL</td>";
+        else if (["Qty on Order", "On Allocation File", "Balance from Orders"].includes(h))
+            html += `<td>${totals[h]}</td>`;
+        else html += "<td></td>";
+    });
+    html += "</tr>";
+
     html += "</tbody></table>";
     container.innerHTML = html;
 
-    // Totals
-    const totalKeys = ["Qty on Order", "On Allocation File", "Balance from Orders"];
-    const totals = calculateTotals(filtered, totalKeys);
+    // Also show totals in the summary area
     const totalDiv = document.getElementById("totals");
-    totalDiv.innerHTML = "Totals — " + totalKeys.map(k => k + ": " + totals[k]).join(" | ");
+    totalDiv.innerHTML = "Totals — " +
+      ["Qty on Order", "On Allocation File", "Balance from Orders"]
+        .map(k => k + ": " + totals[k]).join(" | ");
 }
 
 function renderMismatchReport(data) {
     const container = document.getElementById("mismatchResults");
-    // Show only rows where Qty on Order ≠ On Allocation File
+    const totalsDiv = document.getElementById("mismatchTotals");
     const mismatches = data.filter(row => row["Qty on Order"] !== row["On Allocation File"]);
     if (mismatches.length === 0) {
         container.innerHTML = "<p>No mismatches found.</p>";
+        totalsDiv.innerHTML = "";
         return;
     }
     const headers = ["Item Code", "Style Code", "Qty on Order", "On Allocation File", "Mismatch Note"];
@@ -177,24 +185,37 @@ function renderMismatchReport(data) {
         }
         html += "<tr>";
         headers.forEach(h => {
-            if (h === "Mismatch Note") {
-                html += `<td>${note}</td>`;
-            } else {
-                html += `<td>${row[h]}</td>`;
-            }
+            if (h === "Mismatch Note") html += `<td>${note}</td>`;
+            else html += `<td>${row[h]}</td>`;
         });
         html += "</tr>";
     });
+
+    // Totals row
+    const totals = calculateTotals(mismatches, ["Qty on Order", "On Allocation File"]);
+    html += "<tr style='font-weight: bold; background: #eaf2fb;'>";
+    headers.forEach(h => {
+        if (h === "Item Code") html += "<td>TOTAL</td>";
+        else if (["Qty on Order", "On Allocation File"].includes(h))
+            html += `<td>${totals[h]}</td>`;
+        else html += "<td></td>";
+    });
+    html += "</tr>";
+
     html += "</tbody></table>";
     container.innerHTML = html;
+    totalsDiv.innerHTML = "Totals — " +
+      ["Qty on Order", "On Allocation File"]
+        .map(k => k + ": " + totals[k]).join(" | ");
 }
 
 function renderToOrderReport(data) {
     const container = document.getElementById("toOrderResults");
-    // Show only rows where Balance from Orders > On Allocation File
+    const totalsDiv = document.getElementById("toOrderTotals");
     const filtered = data.filter(row => row["Balance from Orders"] > row["On Allocation File"]);
     if (filtered.length === 0) {
         container.innerHTML = "<p>No items to order.</p>";
+        totalsDiv.innerHTML = "";
         return;
     }
     const headers = ["Item Code", "Style Code", "On Allocation File", "Balance from Orders"];
@@ -206,19 +227,130 @@ function renderToOrderReport(data) {
         headers.forEach(h => html += `<td>${row[h]}</td>`);
         html += "</tr>";
     });
+    // Totals row
+    const totals = calculateTotals(filtered, ["On Allocation File", "Balance from Orders"]);
+    html += "<tr style='font-weight: bold; background: #eaf2fb;'>";
+    headers.forEach(h => {
+        if (h === "Item Code") html += "<td>TOTAL</td>";
+        else if (["On Allocation File", "Balance from Orders"].includes(h))
+            html += `<td>${totals[h]}</td>`;
+        else html += "<td></td>";
+    });
+    html += "</tr>";
+
     html += "</tbody></table>";
     container.innerHTML = html;
+    totalsDiv.innerHTML = "Totals — " +
+      ["On Allocation File", "Balance from Orders"]
+        .map(k => k + ": " + totals[k]).join(" | ");
 }
 
-function exportResults() {
-    if (!analyzedData || analyzedData.length === 0) {
-        alert("Please analyze a file first.");
+function exportReport(type) {
+    let headers, rows, filename;
+    if (type === 'main') {
+        headers = ["Item Code", "Style Code", "Qty on Order", "On Allocation File", "Balance from Orders"];
+        rows = analyzedData.map(r => headers.reduce((obj, h) => (obj[h] = r[h], obj), {}));
+        filename = "Stock_Order_Main_Report.xlsx";
+    } else if (type === 'mismatch') {
+        headers = ["Item Code", "Style Code", "Qty on Order", "On Allocation File", "Mismatch Note"];
+        rows = analyzedData
+          .filter(r => r["Qty on Order"] !== r["On Allocation File"])
+          .map(r => {
+              let note = `Qty on Order (${r["Qty on Order"]}) ≠ On Allocation File (${r["On Allocation File"]})`;
+              return {
+                  "Item Code": r["Item Code"],
+                  "Style Code": r["Style Code"],
+                  "Qty on Order": r["Qty on Order"],
+                  "On Allocation File": r["On Allocation File"],
+                  "Mismatch Note": note
+              };
+          });
+        filename = "Stock_Order_Mismatch_Report.xlsx";
+    } else if (type === 'toorder') {
+        headers = ["Item Code", "Style Code", "On Allocation File", "Balance from Orders"];
+        rows = analyzedData
+          .filter(r => r["Balance from Orders"] > r["On Allocation File"])
+          .map(r => headers.reduce((obj, h) => (obj[h] = r[h], obj), {}));
+        filename = "Stock_Order_ToOrder_Report.xlsx";
+    } else {
+        alert("Unknown report type.");
         return;
     }
-    const ws = XLSX.utils.json_to_sheet(analyzedData);
+    if (!rows || rows.length === 0) {
+        alert("No data to export for this report.");
+        return;
+    }
+    // Add totals row
+    let totals = calculateTotals(rows, headers.filter(h =>
+        typeof rows[0][h] === 'number' && h !== 'Item Code' && h !== 'Style Code' && h !== 'Mismatch Note'
+    ));
+    let totalsRow = {};
+    headers.forEach(h => {
+        if (h === "Item Code") totalsRow[h] = "TOTAL";
+        else if (totals[h] !== undefined) totalsRow[h] = totals[h];
+        else totalsRow[h] = "";
+    });
+    rows.push(totalsRow);
+    const ws = XLSX.utils.json_to_sheet(rows);
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Main Report");
-    XLSX.writeFile(wb, "Stock_Order_Main_Report.xlsx");
+    XLSX.utils.book_append_sheet(wb, ws, type.charAt(0).toUpperCase() + type.slice(1) + " Report");
+    XLSX.writeFile(wb, filename);
+}
+
+function exportAllReports() {
+    // Create a workbook with all three reports
+    const wb = XLSX.utils.book_new();
+    // Main
+    let mainHeaders = ["Item Code", "Style Code", "Qty on Order", "On Allocation File", "Balance from Orders"];
+    let mainRows = analyzedData.map(r => mainHeaders.reduce((obj, h) => (obj[h] = r[h], obj), {}));
+    let mainTotals = calculateTotals(mainRows, ["Qty on Order", "On Allocation File", "Balance from Orders"]);
+    let mainTotalsRow = {};
+    mainHeaders.forEach(h => {
+        if (h === "Item Code") mainTotalsRow[h] = "TOTAL";
+        else if (mainTotals[h] !== undefined) mainTotalsRow[h] = mainTotals[h];
+        else mainTotalsRow[h] = "";
+    });
+    mainRows.push(mainTotalsRow);
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(mainRows), "Main Report");
+    // Mismatch
+    let mismatchHeaders = ["Item Code", "Style Code", "Qty on Order", "On Allocation File", "Mismatch Note"];
+    let mismatchRows = analyzedData
+      .filter(r => r["Qty on Order"] !== r["On Allocation File"])
+      .map(r => {
+          let note = `Qty on Order (${r["Qty on Order"]}) ≠ On Allocation File (${r["On Allocation File"]})`;
+          return {
+              "Item Code": r["Item Code"],
+              "Style Code": r["Style Code"],
+              "Qty on Order": r["Qty on Order"],
+              "On Allocation File": r["On Allocation File"],
+              "Mismatch Note": note
+          };
+      });
+    let mismatchTotals = calculateTotals(mismatchRows, ["Qty on Order", "On Allocation File"]);
+    let mismatchTotalsRow = {};
+    mismatchHeaders.forEach(h => {
+        if (h === "Item Code") mismatchTotalsRow[h] = "TOTAL";
+        else if (mismatchTotals[h] !== undefined) mismatchTotalsRow[h] = mismatchTotals[h];
+        else mismatchTotalsRow[h] = "";
+    });
+    mismatchRows.push(mismatchTotalsRow);
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(mismatchRows), "Mismatch Report");
+    // To Order
+    let toOrderHeaders = ["Item Code", "Style Code", "On Allocation File", "Balance from Orders"];
+    let toOrderRows = analyzedData
+      .filter(r => r["Balance from Orders"] > r["On Allocation File"])
+      .map(r => toOrderHeaders.reduce((obj, h) => (obj[h] = r[h], obj), {}));
+    let toOrderTotals = calculateTotals(toOrderRows, ["On Allocation File", "Balance from Orders"]);
+    let toOrderTotalsRow = {};
+    toOrderHeaders.forEach(h => {
+        if (h === "Item Code") toOrderTotalsRow[h] = "TOTAL";
+        else if (toOrderTotals[h] !== undefined) toOrderTotalsRow[h] = toOrderTotals[h];
+        else toOrderTotalsRow[h] = "";
+    });
+    toOrderRows.push(toOrderTotalsRow);
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(toOrderRows), "To Order Report");
+
+    XLSX.writeFile(wb, "Stock_Order_All_Reports.xlsx");
 }
 
 function calculateTotals(data, keys) {
@@ -226,7 +358,9 @@ function calculateTotals(data, keys) {
     keys.forEach(k => totals[k] = 0);
     data.forEach(row => {
         keys.forEach(k => {
-            totals[k] += Number(row[k] || 0);
+            let val = row[k];
+            if (typeof val === 'string') val = Number(val.replace(/,/g, ''));
+            totals[k] += Number(val || 0);
         });
     });
     return totals;
