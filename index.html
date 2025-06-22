@@ -18,6 +18,16 @@
       <button class="tab-button active" onclick="openTab('main')">Main Report</button>
       <button class="tab-button" onclick="openTab('to-order')">To Order Report</button>
     </div>
+<!-- Add this inside <body> -->
+<div class="download-template-section" style="padding: 1rem; border-bottom: 1px solid #ccc;">
+  <h2>Download Template</h2>
+  <label for="templateFormat">Select Format:</label>
+  <select id="templateFormat">
+    <option value="xlsx">Excel (.xlsx)</option>
+    <option value="csv">CSV (.csv)</option>
+  </select>
+  <button onclick="downloadTemplate()" style="margin-left: 10px;">Download Template</button>
+</div>
 
     <div id="main" class="tab-content active-tab">
       <h3>📄 Main Report</h3>
