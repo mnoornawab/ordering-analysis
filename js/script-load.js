@@ -1,56 +1,66 @@
 
-function processFile() {
-  const fileInput = document.getElementById('file-input');
-  const file = fileInput.files[0];
-  const statusDiv = document.getElementById('status');
+document.addEventListener("DOMContentLoaded", () => {
+  document.getElementById("file-input").addEventListener("change", handleFile, false);
+});
+
+let sheetData = [];
+
+function handleFile(e) {
+  const file = e.target.files[0];
   if (!file) return;
 
   const reader = new FileReader();
-  reader.onload = function(e) {
-    const data = new Uint8Array(e.target.result);
-    const workbook = XLSX.read(data, { type: 'array' });
+  reader.onload = (evt) => {
+    const data = new Uint8Array(evt.target.result);
+    const workbook = XLSX.read(data, { type: "array" });
 
-    const sheet1 = XLSX.utils.sheet_to_json(workbook.Sheets['Quantity on Order - SIMA System'], { defval: '' });
-    const sheet2 = XLSX.utils.sheet_to_json(workbook.Sheets['Allocation File'], { defval: '' });
-    const sheet3 = XLSX.utils.sheet_to_json(workbook.Sheets['Orders-SIMA System'], { defval: '' });
+    const sheet1 = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], { defval: "" });
+    const sheet2 = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[1]], { defval: "" });
+    const sheet3 = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[2]], { defval: "" });
 
-    const allocationMap = {};
-    sheet2.forEach(row => {
-      const item = String(row['Item Code']).trim();
-      const qty = parseInt(row['Pending Order Qty']) || 0;
-      if (!allocationMap[item]) allocationMap[item] = 0;
-      allocationMap[item] += qty;
-    });
+    const itemMap = {};
 
-    const orderBalanceMap = {};
-    sheet3.forEach(row => {
-      const item = String(row['Item Code']).trim();
-      const balance = parseInt(row['BALANCE']) || 0;
-      if (!orderBalanceMap[item]) orderBalanceMap[item] = 0;
-      orderBalanceMap[item] += balance;
-    });
-
-    const results = [];
+    // Sheet 1: Base
     sheet1.forEach(row => {
-      const itemCode = String(row['Item Code']).trim();
-      const styleCode = row['Style'];
-      const qtyOnOrder = parseInt(row['Qty On Order']) || 0;
-      const qtyAllocated = allocationMap[itemCode] || 0;
-      const balanceOrders = orderBalanceMap[itemCode] || 0;
-
-      results.push({
-        itemCode,
-        styleCode,
-        qtyOnOrder,
-        qtyAllocated,
-        balanceOrders
-      });
+      const itemCode = row['Item Code']?.toString().trim();
+      const style = row['Style']?.toString().trim();
+      const qty = parseInt(row['Qty On Order']) || 0;
+      if (!itemCode) return;
+      if (!itemMap[itemCode]) {
+        itemMap[itemCode] = {
+          'Item Code': itemCode,
+          'Style': style,
+          'Qty On Order': 0,
+          'Pending Order Qty': 0,
+          'BALANCE': 0
+        };
+      }
+      itemMap[itemCode]['Qty On Order'] += qty;
     });
 
-    renderMainReport(results);
-    renderMismatchReport(results);
-    renderToOrderReport(results);
-    statusDiv.innerHTML = '<p style="color:green;">✅ File processed successfully.</p>';
+    // Sheet 2: Allocation File
+    sheet2.forEach(row => {
+      const itemCode = row['Item Code']?.toString().trim();
+      const qty = parseInt(row['Pending Order Qty']) || 0;
+      if (itemMap[itemCode]) {
+        itemMap[itemCode]['Pending Order Qty'] += qty;
+      }
+    });
+
+    // Sheet 3: Orders
+    sheet3.forEach(row => {
+      const itemCode = row['Item Code']?.toString().trim();
+      const qty = parseInt(row['Balance from Orders']) || 0;
+      if (itemMap[itemCode]) {
+        itemMap[itemCode]['BALANCE'] += qty;
+      }
+    });
+
+    sheetData = Object.values(itemMap);
+
+    document.getElementById("main-report").innerHTML = generateMainTable(sheetData);
+    document.getElementById("to-order-report").innerHTML = generateToOrderTable(sheetData);
+    document.getElementById("status").innerHTML = "<p style='color:green;'>✅ File processed successfully.</p>";
   };
   reader.readAsArrayBuffer(file);
 }
