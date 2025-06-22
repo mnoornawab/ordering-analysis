@@ -1,72 +1,78 @@
 body {
-  font-family: Arial, sans-serif;
-  background: #f7f9fc;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background: #f4f6f8;
   margin: 0;
   padding: 20px;
-  color: #333;
+  color: #2c3e50;
 }
 
 .container {
   max-width: 1200px;
   margin: auto;
-  background: white;
+  background: #ffffff;
   padding: 30px;
-  border-radius: 8px;
-  box-shadow: 0 0 10px rgba(0,0,0,0.05);
+  border-radius: 12px;
+  box-shadow: 0 8px 20px rgba(0,0,0,0.08);
 }
 
 h1 {
   text-align: center;
   margin-bottom: 30px;
-  color: #2c3e50;
+  color: #34495e;
+  font-size: 2rem;
 }
 
 input[type="file"] {
   display: block;
-  margin: 0 auto 20px auto;
+  margin: 10px auto;
 }
 
 button {
-  background: #3498db;
+  background: #2d8cf0;
   color: white;
   border: none;
-  padding: 10px 20px;
+  padding: 10px 25px;
   font-size: 15px;
   cursor: pointer;
-  border-radius: 4px;
-  margin: 10px 0;
+  border-radius: 6px;
+  margin-top: 10px;
+  transition: 0.3s ease;
 }
 
 button:hover {
-  background: #2980b9;
+  background: #1a6ed8;
 }
 
 .tabs {
   display: flex;
   justify-content: center;
-  margin-top: 20px;
+  margin-top: 30px;
 }
 
 .tab-button {
   background: #ecf0f1;
   border: none;
-  padding: 10px 15px;
+  padding: 12px 20px;
   margin: 0 5px;
   cursor: pointer;
-  border-radius: 4px 4px 0 0;
-  font-weight: bold;
+  border-radius: 6px 6px 0 0;
+  font-weight: 600;
+  color: #2c3e50;
+  transition: 0.3s ease;
 }
 
 .tab-button.active {
   background: #ffffff;
-  border-bottom: 2px solid #3498db;
+  border-bottom: 3px solid #2d8cf0;
+  color: #2d8cf0;
 }
 
 .tab-content {
   display: none;
-  padding: 20px;
+  padding: 25px;
   border: 1px solid #ddd;
   border-top: none;
+  animation: fadeIn 0.3s ease-in-out;
 }
 
 .tab-content.active-tab {
@@ -80,27 +86,33 @@ table {
 }
 
 table, th, td {
-  border: 1px solid #ccc;
+  border: 1px solid #ddd;
 }
 
 th, td {
-  padding: 8px 12px;
+  padding: 10px 12px;
   text-align: center;
 }
 
 th {
-  background-color: #f0f4f8;
+  background-color: #f5f7fa;
+  color: #2c3e50;
   font-weight: bold;
 }
 
 tr:nth-child(even) {
-  background-color: #fafafa;
+  background-color: #fcfcfc;
 }
 
 tr:hover {
-  background-color: #f1f1f1;
+  background-color: #f0f8ff;
 }
 
 button + button {
   margin-left: 10px;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
 }
