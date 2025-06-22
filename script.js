@@ -1,5 +1,7 @@
 let mismatchResults = [];
 let toOrderResults = [];
+let filteredToOrder = [];
+let showOnlyToOrder = false;
 
 function processFile() {
   const fileInput = document.getElementById("file-input");
@@ -38,87 +40,85 @@ function processFile() {
 function analyzeData(simaData, allocationData, ordersData) {
   const simaMap = {};
   simaData.forEach(row => {
-    const item = String(row["Item Code"]).trim();
-    simaMap[item] = {
-      style: row["Style Code"] || "",
-      qty: Number(row["Qty On Order"] || 0)
-    };
+    const code = String(row["Item Code"]).trim();
+    const style = row["Style Code"] || "";
+    const qty = Number(row["Qty On Order"] || 0);
+    simaMap[code] = { qty, style };
   });
 
   const allocationMap = {};
   allocationData.forEach(row => {
-    const item = String(row["Material code"]).trim();
+    const code = String(row["Material code"]).trim();
     const qty = Number(row["Pending order qty"] || 0);
-    if (!allocationMap[item]) allocationMap[item] = 0;
-    allocationMap[item] += qty;
+    if (!allocationMap[code]) allocationMap[code] = 0;
+    allocationMap[code] += qty;
   });
 
-  const ordersMap = {};
+  const balanceMap = {};
   ordersData.forEach(row => {
-    const item = String(row["Item Code"]).trim();
-    if (!ordersMap[item]) {
-      ordersMap[item] = { ordered: 0, reserved: 0, confirmed: 0 };
-    }
-    ordersMap[item].ordered += Number(row["Total Qty Ordered"] || 0);
-    ordersMap[item].reserved += Number(row["Reserved"] || 0);
-    ordersMap[item].confirmed += Number(row["Confirmed"] || 0);
+    const code = String(row["Item Code"]).trim();
+    const balance = Number(row["Balance"] || 0);
+    if (!balanceMap[code]) balanceMap[code] = 0;
+    balanceMap[code] += balance;
   });
 
   mismatchResults = [];
   toOrderResults = [];
+  filteredToOrder = [];
 
-  const allItemCodes = new Set([
-    ...Object.keys(simaMap),
-    ...Object.keys(allocationMap)
-  ]);
-
-  allItemCodes.forEach(code => {
+  const allCodes = new Set([...Object.keys(simaMap), ...Object.keys(allocationMap)]);
+  allCodes.forEach(code => {
     const simaQty = simaMap[code]?.qty || 0;
-    const allocationQty = allocationMap[code] || 0;
+    const allocQty = allocationMap[code] || 0;
     const style = simaMap[code]?.style || "";
 
     let status = "OK";
-    if (!simaMap[code]) {
-      status = "Only in Allocation File";
-    } else if (!allocationMap[code]) {
-      status = "Only in SIMA System";
-    } else if (simaQty !== allocationQty) {
-      status = "Qty Mismatch";
-    }
+    if (!simaMap[code]) status = "Only in Allocation File";
+    else if (!allocationMap[code]) status = "Only in SIMA System";
+    else if (simaQty !== allocQty) status = "Qty Mismatch";
 
     if (status !== "OK") {
       mismatchResults.push({
         "Item Code": code,
         "Style Code": style,
         "SIMA Qty": simaQty,
-        "Allocation Qty": allocationQty,
+        "Allocation Qty": allocQty,
         "Status": status
       });
     }
   });
 
-  Object.keys(ordersMap).forEach(code => {
-    const order = ordersMap[code];
-    const balance = order.ordered - order.reserved - order.confirmed;
-    const allocationQty = allocationMap[code] || 0;
+  Object.keys(balanceMap).forEach(code => {
+    const balance = balanceMap[code];
+    const allocQty = allocationMap[code] || 0;
+    const simaQty = simaMap[code]?.qty || 0;
+    const style = simaMap[code]?.style || "";
+    const qtyToOrder = balance - allocQty - simaQty;
 
-    if (balance > allocationQty) {
-      toOrderResults.push({
-        "Item Code": code,
-        "Total Ordered": order.ordered,
-        "Reserved": order.reserved,
-        "Confirmed": order.confirmed,
-        "Balance": balance,
-        "Allocated Qty": allocationQty,
-        "Qty to Order": balance - allocationQty
-      });
-    }
+    const result = {
+      "Item Code": code,
+      "Style Code": style,
+      "Balance from Orders": balance,
+      "Qty Allocated": allocQty,
+      "Qty on Order (SIMA)": simaQty,
+      "Qty to Order": qtyToOrder > 0 ? qtyToOrder : 0
+    };
+
+    toOrderResults.push(result);
   });
 
+  filteredToOrder = toOrderResults.filter(row => row["Qty to Order"] > 0);
+
   displayTable("mismatch-table", mismatchResults, true);
-  displayTable("order-table", toOrderResults, false);
-  document.getElementById("status").innerText = "✅ Done.";
+  displayToOrderTable();
+  document.getElementById("status").innerText = "✅ Analysis complete.";
   document.getElementById("download-btn").style.display = "inline-block";
+  document.getElementById("filter-btn").style.display = "inline-block";
+}
+
+function displayToOrderTable() {
+  const data = showOnlyToOrder ? filteredToOrder : toOrderResults;
+  displayTable("order-table", data, false);
 }
 
 function displayTable(containerId, data, highlightMismatch) {
@@ -126,7 +126,7 @@ function displayTable(containerId, data, highlightMismatch) {
   container.innerHTML = "";
 
   if (!data.length) {
-    container.innerText = "No issues found.";
+    container.innerText = "No records to display.";
     return;
   }
 
@@ -143,12 +143,13 @@ function displayTable(containerId, data, highlightMismatch) {
   });
   thead.appendChild(headerRow);
 
+  const numericTotals = {};
+
   data.forEach(row => {
     const tr = document.createElement("tr");
-
-    if (highlightMismatch && row["Status"] && row["Status"] !== "OK") {
+    if (highlightMismatch && row["Status"] !== "OK") {
       tr.classList.add("highlight-missing");
-    } else if (!highlightMismatch) {
+    } else if (!highlightMismatch && row["Qty to Order"] > 0) {
       tr.classList.add("highlight-to-order");
     }
 
@@ -156,31 +157,49 @@ function displayTable(containerId, data, highlightMismatch) {
       const td = document.createElement("td");
       td.innerText = row[key];
       tr.appendChild(td);
+
+      if (!isNaN(row[key])) {
+        if (!numericTotals[key]) numericTotals[key] = 0;
+        numericTotals[key] += Number(row[key]);
+      }
     });
 
     tbody.appendChild(tr);
   });
+
+  // Add totals row
+  const totalsRow = document.createElement("tr");
+  headers.forEach(key => {
+    const td = document.createElement("td");
+    if (numericTotals[key]) {
+      td.innerText = `Total: ${numericTotals[key]}`;
+      td.style.fontWeight = "bold";
+    }
+    totalsRow.appendChild(td);
+  });
+  tbody.appendChild(totalsRow);
 
   table.appendChild(thead);
   table.appendChild(tbody);
   container.appendChild(table);
 }
 
+function toggleFilter() {
+  showOnlyToOrder = !showOnlyToOrder;
+  document.getElementById("filter-btn").innerText = showOnlyToOrder ? "Show All" : "Show Only To Order";
+  displayToOrderTable();
+}
+
 function downloadCSV() {
-  const allData = [...mismatchResults, ...toOrderResults];
-  if (!allData.length) return;
+  const wb = XLSX.utils.book_new();
 
-  const headers = Object.keys(allData[0]);
-  const csv = [
-    headers.join(","),
-    ...allData.map(row => headers.map(h => `"${row[h]}"`).join(","))
-  ].join("\n");
+  const mismatchSheet = XLSX.utils.json_to_sheet(mismatchResults);
+  const toOrderSheet = XLSX.utils.json_to_sheet(toOrderResults);
 
-  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-  const link = document.createElement("a");
-  link.href = URL.createObjectURL(blob);
-  link.download = "stock_analysis_report.csv";
-  link.click();
+  XLSX.utils.book_append_sheet(wb, mismatchSheet, "Mismatch Report");
+  XLSX.utils.book_append_sheet(wb, toOrderSheet, "To Order Report");
+
+  XLSX.writeFile(wb, "stock_analysis_report.xlsx");
 }
 
 function openTab(tabId) {
