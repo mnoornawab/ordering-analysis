@@ -41,7 +41,8 @@ function analyzeData(simaData, allocationData, ordersData) {
   const simaMap = {};
   simaData.forEach(row => {
     const code = String(row["Item Code"]).trim();
-    const style = row["Style Code"] || "";
+    if (!code || code === "undefined") return;
+    const style = row["Material Code"] || "";
     const qty = Number(row["Qty On Order"] || 0);
     simaMap[code] = { qty, style };
   });
@@ -49,6 +50,7 @@ function analyzeData(simaData, allocationData, ordersData) {
   const allocationMap = {};
   allocationData.forEach(row => {
     const code = String(row["Material code"]).trim();
+    if (!code || code === "undefined") return;
     const qty = Number(row["Pending order qty"] || 0);
     if (!allocationMap[code]) allocationMap[code] = 0;
     allocationMap[code] += qty;
@@ -57,6 +59,7 @@ function analyzeData(simaData, allocationData, ordersData) {
   const balanceMap = {};
   ordersData.forEach(row => {
     const code = String(row["Item Code"]).trim();
+    if (!code || code === "undefined") return;
     const balance = Number(row["Balance"] || 0);
     if (!balanceMap[code]) balanceMap[code] = 0;
     balanceMap[code] += balance;
@@ -94,6 +97,8 @@ function analyzeData(simaData, allocationData, ordersData) {
     const simaQty = simaMap[code]?.qty || 0;
     const style = simaMap[code]?.style || "";
     const qtyToOrder = balance - allocQty - simaQty;
+
+    if (!code || code === "undefined") return;
 
     const result = {
       "Item Code": code,
@@ -146,7 +151,9 @@ function displayTable(containerId, data, highlightMismatch) {
   const numericTotals = {};
 
   data.forEach(row => {
+    if (!row["Item Code"] || row["Item Code"] === "undefined") return;
     const tr = document.createElement("tr");
+
     if (highlightMismatch && row["Status"] !== "OK") {
       tr.classList.add("highlight-missing");
     } else if (!highlightMismatch && row["Qty to Order"] > 0) {
@@ -158,7 +165,7 @@ function displayTable(containerId, data, highlightMismatch) {
       td.innerText = row[key];
       tr.appendChild(td);
 
-      if (!isNaN(row[key])) {
+      if (!isNaN(row[key]) && typeof row[key] === "number") {
         if (!numericTotals[key]) numericTotals[key] = 0;
         numericTotals[key] += Number(row[key]);
       }
@@ -192,13 +199,10 @@ function toggleFilter() {
 
 function downloadCSV() {
   const wb = XLSX.utils.book_new();
-
   const mismatchSheet = XLSX.utils.json_to_sheet(mismatchResults);
   const toOrderSheet = XLSX.utils.json_to_sheet(toOrderResults);
-
   XLSX.utils.book_append_sheet(wb, mismatchSheet, "Mismatch Report");
   XLSX.utils.book_append_sheet(wb, toOrderSheet, "To Order Report");
-
   XLSX.writeFile(wb, "stock_analysis_report.xlsx");
 }
 
