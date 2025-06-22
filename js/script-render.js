@@ -7,13 +7,13 @@ function generateMainTable(data) {
 
   data.forEach(row => {
     const hideClass = (row['Qty On Order'] === 0 && row['Pending Order Qty'] === 0 && row['BALANCE'] === 0) ? 'zero-row' : '';
-    html += `<tr class="\${hideClass}"><td>\${row['Item Code']}</td><td>\${row['Style']}</td><td>\${row['Qty On Order']}</td><td>\${row['Pending Order Qty']}</td><td>\${row['BALANCE']}</td></tr>`;
+    html += `<tr class="${hideClass}"><td>${row['Item Code']}</td><td>${row['Style']}</td><td>${row['Qty On Order']}</td><td>${row['Pending Order Qty']}</td><td>${row['BALANCE']}</td></tr>`;
     totalOrder += row['Qty On Order'];
     totalAlloc += row['Pending Order Qty'];
     totalBalance += row['BALANCE'];
   });
 
-  html += `<tr><th>Total</th><td></td><th>\${totalOrder}</th><th>\${totalAlloc}</th><th>\${totalBalance}</th></tr>`;
+  html += `<tr><th>Total</th><td></td><th>${totalOrder}</th><th>${totalAlloc}</th><th>${totalBalance}</th></tr>`;
   html += '</tbody></table>';
   return html;
 }
@@ -25,14 +25,14 @@ function generateToOrderTable(data) {
   data.forEach(row => {
     const toOrder = row['BALANCE'] - row['Pending Order Qty'];
     if (toOrder > 0) {
-      html += `<tr><td>\${row['Item Code']}</td><td>\${row['Style']}</td><td>\${row['BALANCE']}</td><td>\${row['Pending Order Qty']}</td><td>\${toOrder}</td></tr>`;
+      html += `<tr><td>${row['Item Code']}</td><td>${row['Style']}</td><td>${row['BALANCE']}</td><td>${row['Pending Order Qty']}</td><td>${toOrder}</td></tr>`;
       totalBalance += row['BALANCE'];
       totalAlloc += row['Pending Order Qty'];
       totalToOrder += toOrder;
     }
   });
 
-  html += `<tr><th>Total</th><td></td><th>\${totalBalance}</th><th>\${totalAlloc}</th><th>\${totalToOrder}</th></tr>`;
+  html += `<tr><th>Total</th><td></td><th>${totalBalance}</th><th>${totalAlloc}</th><th>${totalToOrder}</th></tr>`;
   html += '</tbody></table>';
   return html;
 }
