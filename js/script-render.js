@@ -15,18 +15,23 @@ function generateMainTable(data) {
   let totals = { order: 0, allocation: 0, balance: 0 };
 
   data.forEach(row => {
-    const hideClass = (row.qtyOnOrder === 0 && row.qtyAllocated === 0 && row.balanceOrders === 0) ? 'zero-row' : '';
+    const order = parseInt(row.qtyOnOrder || 0);
+    const alloc = parseInt(row.qtyAllocated || 0);
+    const balance = parseInt(row.balanceOrders || 0);
+
+    const hideClass = (order === 0 && alloc === 0 && balance === 0) ? 'zero-row' : '';
+
     html += `<tr class="${hideClass}">
-      <td>${row.itemCode}</td>
-      <td>${row.styleCode}</td>
-      <td>${row.qtyOnOrder}</td>
-      <td>${row.qtyAllocated}</td>
-      <td>${row.balanceOrders}</td>
+      <td>${row.itemCode || ''}</td>
+      <td>${row.styleCode || ''}</td>
+      <td>${order}</td>
+      <td>${alloc}</td>
+      <td>${balance}</td>
     </tr>`;
 
-    totals.order += row.qtyOnOrder;
-    totals.allocation += row.qtyAllocated;
-    totals.balance += row.balanceOrders;
+    totals.order += order;
+    totals.allocation += alloc;
+    totals.balance += balance;
   });
 
   html += `<tr><th>Total</th><td></td><th>${totals.order}</th><th>${totals.allocation}</th><th>${totals.balance}</th></tr>`;
