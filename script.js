@@ -1,113 +1,125 @@
-// ✨ Updated script.js to include Mismatch Report tab
+// script.js
 
 function processFile() {
-  const fileInput = document.getElementById("file-input");
+  const fileInput = document.getElementById('file-input');
   const file = fileInput.files[0];
-  if (!file) {
-    alert("Please select an Excel file.");
-    return;
-  }
+  const statusDiv = document.getElementById('status');
+  if (!file) return;
 
   const reader = new FileReader();
-  reader.onload = function (e) {
+  reader.onload = (e) => {
     const data = new Uint8Array(e.target.result);
-    const workbook = XLSX.read(data, { type: "array" });
+    const workbook = XLSX.read(data, { type: 'array' });
 
-    const simaSheet = XLSX.utils.sheet_to_json(workbook.Sheets["Quantity on Order - SIMA System"]);
-    const allocationSheet = XLSX.utils.sheet_to_json(workbook.Sheets["Allocation File"]);
-    const ordersSheet = XLSX.utils.sheet_to_json(workbook.Sheets["Orders-SIMA System"]);
+    const sheetSIMA = workbook.Sheets['Quantity on Order - SIMA System'];
+    const sheetAllocation = workbook.Sheets['Allocation File'];
+    const sheetOrders = workbook.Sheets['Orders-SIMA System'];
 
-    const simaMap = {};
-    simaSheet.forEach(row => {
-      const code = String(row["Item Code"]).trim();
-      if (!code || code.toLowerCase() === "undefined") return;
-      simaMap[code] = {
-        "Item Code": code,
-        "Style Code": row["Style"] || "",
-        "Qty On Order": Number(row["Qty On Order"]) || 0
-      };
+    const simaData = XLSX.utils.sheet_to_json(sheetSIMA, { defval: '' });
+    const allocData = XLSX.utils.sheet_to_json(sheetAllocation, { defval: '' });
+    const ordersData = XLSX.utils.sheet_to_json(sheetOrders, { defval: '' });
+
+    // Create a base item map from SIMA sheet
+    const itemMap = {};
+    simaData.forEach(row => {
+      const itemCode = row['Item Code']?.toString().trim();
+      const styleCode = row['Material Code']?.toString().trim();
+      const qtyOnOrder = parseInt(row['Qty On Order']) || 0;
+      if (itemCode && itemCode !== 'undefined') {
+        itemMap[itemCode] = {
+          itemCode,
+          styleCode,
+          qtyOnOrder,
+          qtyAllocated: 0,
+          balanceOrders: 0,
+        };
+      }
     });
 
-    const allocationTotals = {};
-    allocationSheet.forEach(row => {
-      const code = String(row["Material Code"]).trim();
-      const qty = Number(row["Pending Order Qty"]) || 0;
-      if (!allocationTotals[code]) allocationTotals[code] = 0;
-      allocationTotals[code] += qty;
+    // Merge allocation file data
+    allocData.forEach(row => {
+      const itemCode = row['Material code']?.toString().trim();
+      const qty = parseInt(row['Pending order qty']) || 0;
+      if (itemMap[itemCode]) {
+        itemMap[itemCode].qtyAllocated += qty;
+      }
     });
 
-    const results = Object.keys(simaMap).map(code => {
-      return {
-        "Item Code": code,
-        "Style Code": simaMap[code]["Style Code"],
-        "Qty On Order": simaMap[code]["Qty On Order"],
-        "On Allocation File": allocationTotals[code] || 0
-      };
+    // Merge orders balance data
+    ordersData.forEach(row => {
+      const itemCode = row['ITEMCODE']?.toString().trim();
+      const balance = parseInt(row['BALANCE']) || 0;
+      if (itemMap[itemCode]) {
+        itemMap[itemCode].balanceOrders += balance;
+      }
     });
 
-    // Build Mismatch Report from above
-    const mismatches = results.filter(row => row["Qty On Order"] !== row["On Allocation File"])
-      .map(row => ({
-        ...row,
-        "Mismatch Type": "SIMA vs Allocation"
-      }));
+    const finalData = Object.values(itemMap);
 
-    displayMainReport(results);
-    displayMismatchReport(mismatches);
+    // Render both reports
+    document.getElementById('main-report').innerHTML = generateMainTable(finalData);
+    document.getElementById('mismatch-report').innerHTML = generateMismatchTable(finalData);
+    statusDiv.innerHTML = '<p style="color:green;">✅ File processed successfully.</p>';
   };
-
   reader.readAsArrayBuffer(file);
 }
 
-function displayMainReport(data) {
-  // ... (existing logic from earlier displayTable function)
-  // Create a table for "main-report" div
-  // Use logic already provided in earlier steps
+function generateMainTable(data) {
+  let html = `<label><input type="checkbox" id="hide-zero" onchange="toggleZeroRows(this)"> Hide rows with all 0 values</label>`;
+  html += `<table><thead><tr>
+    <th>Item Code</th><th>Style Code</th><th>Qty On Order</th><th>On Allocation File</th><th>Balance from Orders</th>
+  </tr></thead><tbody>`;
+
+  let totals = { order: 0, allocation: 0, balance: 0 };
+
+  data.forEach(row => {
+    const hideClass = (row.qtyOnOrder === 0 && row.qtyAllocated === 0 && row.balanceOrders === 0) ? 'zero-row' : '';
+    html += `<tr class="${hideClass}">
+      <td>${row.itemCode}</td>
+      <td>${row.styleCode}</td>
+      <td>${row.qtyOnOrder}</td>
+      <td>${row.qtyAllocated}</td>
+      <td>${row.balanceOrders}</td>
+    </tr>`;
+
+    totals.order += row.qtyOnOrder;
+    totals.allocation += row.qtyAllocated;
+    totals.balance += row.balanceOrders;
+  });
+
+  html += `<tr><th>Total</th><td></td><th>${totals.order}</th><th>${totals.allocation}</th><th>${totals.balance}</th></tr>`;
+  html += `</tbody></table>`;
+  return html;
 }
 
-function displayMismatchReport(mismatches) {
-  const container = document.getElementById("mismatch-report");
-  container.innerHTML = "";
+function generateMismatchTable(data) {
+  let html = `<table><thead><tr>
+    <th>Item Code</th><th>Style Code</th><th>Qty On Order</th><th>On Allocation File</th>
+  </tr></thead><tbody>`;
 
-  if (!mismatches.length) {
-    container.innerHTML = "<p>No mismatches found between SIMA and Allocation.</p>";
-    return;
-  }
+  let totalOrder = 0, totalAlloc = 0;
 
-  const table = document.createElement("table");
-  const headers = Object.keys(mismatches[0]);
-
-  const thead = document.createElement("thead");
-  const headerRow = document.createElement("tr");
-  headers.forEach(h => {
-    const th = document.createElement("th");
-    th.innerText = h;
-    headerRow.appendChild(th);
-  });
-  thead.appendChild(headerRow);
-
-  const tbody = document.createElement("tbody");
-  mismatches.forEach(row => {
-    const tr = document.createElement("tr");
-    headers.forEach(h => {
-      const td = document.createElement("td");
-      td.innerText = row[h];
-      tr.appendChild(td);
-    });
-    tbody.appendChild(tr);
+  data.forEach(row => {
+    if (row.qtyOnOrder !== row.qtyAllocated) {
+      html += `<tr style="background:#ffecec;">
+        <td>${row.itemCode}</td>
+        <td>${row.styleCode}</td>
+        <td>${row.qtyOnOrder}</td>
+        <td>${row.qtyAllocated}</td>
+      </tr>`;
+      totalOrder += row.qtyOnOrder;
+      totalAlloc += row.qtyAllocated;
+    }
   });
 
-  table.appendChild(thead);
-  table.appendChild(tbody);
-  container.appendChild(table);
+  html += `<tr><th>Total</th><td></td><th>${totalOrder}</th><th>${totalAlloc}</th></tr>`;
+  html += `</tbody></table>`;
+  return html;
+}
 
-  const downloadBtn = document.createElement("button");
-  downloadBtn.innerText = "Download Mismatch Report";
-  downloadBtn.onclick = function () {
-    const ws = XLSX.utils.json_to_sheet(mismatches);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Mismatch Report");
-    XLSX.writeFile(wb, "Mismatch_Report.xlsx");
-  };
-  container.appendChild(downloadBtn);
+function toggleZeroRows(checkbox) {
+  const rows = document.querySelectorAll('.zero-row');
+  rows.forEach(row => {
+    row.style.display = checkbox.checked ? 'none' : '';
+  });
 }
