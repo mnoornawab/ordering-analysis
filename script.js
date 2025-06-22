@@ -1,15 +1,16 @@
-let finalResults = [];
+let mismatchResults = [];
+let toOrderResults = [];
 
 function processFile() {
   const fileInput = document.getElementById("file-input");
   const file = fileInput.files[0];
 
   if (!file) {
-    alert("Please select an Excel file first.");
+    alert("Please select an Excel file.");
     return;
   }
 
-  document.getElementById("status").innerText = "⏳ Processing file...";
+  document.getElementById("status").innerText = "⏳ Processing...";
   const reader = new FileReader();
 
   reader.onload = function (e) {
@@ -27,7 +28,7 @@ function processFile() {
 
       analyzeData(simaData, allocationData, ordersData);
     } catch (err) {
-      document.getElementById("status").innerText = "❌ Error reading sheets: " + err;
+      document.getElementById("status").innerText = "❌ Sheet Error: " + err;
     }
   };
 
@@ -37,76 +38,95 @@ function processFile() {
 function analyzeData(simaData, allocationData, ordersData) {
   const simaMap = {};
   simaData.forEach(row => {
-    const code = String(row["Item Code"]).trim();
-    const qty = Number(row["Qty On Order"] || 0);
-    simaMap[code] = qty;
+    const item = String(row["Item Code"]).trim();
+    simaMap[item] = {
+      style: row["Style Code"] || "",
+      qty: Number(row["Qty On Order"] || 0)
+    };
   });
 
   const allocationMap = {};
-  const samplePOs = {};
-
   allocationData.forEach(row => {
-    const code = String(row["Material code"]).trim();
+    const item = String(row["Material code"]).trim();
     const qty = Number(row["Pending order qty"] || 0);
-    const po = String(row["PO Reference"] || "").toLowerCase().trim();
-
-    if (!allocationMap[code]) allocationMap[code] = { total: 0, real: 0, sample: [] };
-    allocationMap[code].total += qty;
-
-    if (po.includes("sample")) {
-      allocationMap[code].sample.push({ po: po, qty: qty });
-      if (!samplePOs[code]) samplePOs[code] = [];
-      samplePOs[code].push(`${po} (${qty})`);
-    } else {
-      allocationMap[code].real += qty;
-    }
+    if (!allocationMap[item]) allocationMap[item] = 0;
+    allocationMap[item] += qty;
   });
 
   const ordersMap = {};
   ordersData.forEach(row => {
-    const code = String(row["Item Code"]).trim();
-    if (!ordersMap[code]) {
-      ordersMap[code] = { total: 0, reserved: 0, confirmed: 0 };
+    const item = String(row["Item Code"]).trim();
+    if (!ordersMap[item]) {
+      ordersMap[item] = { ordered: 0, reserved: 0, confirmed: 0 };
     }
-    ordersMap[code].total += Number(row["Total Qty Ordered"] || 0);
-    ordersMap[code].reserved += Number(row["Reserved"] || 0);
-    ordersMap[code].confirmed += Number(row["Confirmed"] || 0);
+    ordersMap[item].ordered += Number(row["Total Qty Ordered"] || 0);
+    ordersMap[item].reserved += Number(row["Reserved"] || 0);
+    ordersMap[item].confirmed += Number(row["Confirmed"] || 0);
   });
 
-  finalResults = [];
+  mismatchResults = [];
+  toOrderResults = [];
 
-  Object.keys(simaMap).forEach(code => {
-    const onOrderQty = simaMap[code] || 0;
-    const order = ordersMap[code] || { total: 0, reserved: 0, confirmed: 0 };
-    const allocation = allocationMap[code] || { total: 0, real: 0, sample: [] };
+  const allItemCodes = new Set([
+    ...Object.keys(simaMap),
+    ...Object.keys(allocationMap)
+  ]);
 
-    const balance = order.total - order.reserved - order.confirmed;
-    const qtyToOrder = Math.max(0, balance - onOrderQty - allocation.real);
-    const mismatch = onOrderQty !== allocation.total;
+  allItemCodes.forEach(code => {
+    const simaQty = simaMap[code]?.qty || 0;
+    const allocationQty = allocationMap[code] || 0;
+    const style = simaMap[code]?.style || "";
 
-    finalResults.push({
-      "Item Code": code,
-      "Total Ordered": order.total,
-      "Reserved": order.reserved,
-      "Confirmed": order.confirmed,
-      "Balance": balance,
-      "On Order (SIMA)": onOrderQty,
-      "Allocated Qty (Real)": allocation.real,
-      "Qty to Order": qtyToOrder,
-      "Allocation Mismatch?": mismatch ? "⚠️ Yes" : "No",
-      "Sample PO Summary": (samplePOs[code] || []).join(", ")
-    });
+    let status = "OK";
+    if (!simaMap[code]) {
+      status = "Only in Allocation File";
+    } else if (!allocationMap[code]) {
+      status = "Only in SIMA System";
+    } else if (simaQty !== allocationQty) {
+      status = "Qty Mismatch";
+    }
+
+    if (status !== "OK") {
+      mismatchResults.push({
+        "Item Code": code,
+        "Style Code": style,
+        "SIMA Qty": simaQty,
+        "Allocation Qty": allocationQty,
+        "Status": status
+      });
+    }
   });
 
-  displayResults(finalResults);
+  Object.keys(ordersMap).forEach(code => {
+    const order = ordersMap[code];
+    const balance = order.ordered - order.reserved - order.confirmed;
+    const allocationQty = allocationMap[code] || 0;
+
+    if (balance > allocationQty) {
+      toOrderResults.push({
+        "Item Code": code,
+        "Total Ordered": order.ordered,
+        "Reserved": order.reserved,
+        "Confirmed": order.confirmed,
+        "Balance": balance,
+        "Allocated Qty": allocationQty,
+        "Qty to Order": balance - allocationQty
+      });
+    }
+  });
+
+  displayTable("mismatch-table", mismatchResults, true);
+  displayTable("order-table", toOrderResults, false);
+  document.getElementById("status").innerText = "✅ Done.";
+  document.getElementById("download-btn").style.display = "inline-block";
 }
 
-function displayResults(data) {
-  const container = document.getElementById("results-container");
+function displayTable(containerId, data, highlightMismatch) {
+  const container = document.getElementById(containerId);
   container.innerHTML = "";
 
   if (!data.length) {
-    container.innerText = "No matching records.";
+    container.innerText = "No issues found.";
     return;
   }
 
@@ -126,11 +146,10 @@ function displayResults(data) {
   data.forEach(row => {
     const tr = document.createElement("tr");
 
-    // Highlight rules
-    if (row["Qty to Order"] > 0) {
-      tr.style.backgroundColor = "#ffe6e6"; // red
-    } else if (row["Allocation Mismatch?"] === "⚠️ Yes") {
-      tr.style.backgroundColor = "#fff3cd"; // yellow
+    if (highlightMismatch && row["Status"] && row["Status"] !== "OK") {
+      tr.classList.add("highlight-missing");
+    } else if (!highlightMismatch) {
+      tr.classList.add("highlight-to-order");
     }
 
     headers.forEach(key => {
@@ -145,21 +164,29 @@ function displayResults(data) {
   table.appendChild(thead);
   table.appendChild(tbody);
   container.appendChild(table);
-
-  document.getElementById("status").innerText = `✅ Analysis complete. ${data.length} items processed.`;
-  document.getElementById("download-btn").style.display = "inline-block";
 }
 
 function downloadCSV() {
-  const headers = Object.keys(finalResults[0]);
+  const allData = [...mismatchResults, ...toOrderResults];
+  if (!allData.length) return;
+
+  const headers = Object.keys(allData[0]);
   const csv = [
     headers.join(","),
-    ...finalResults.map(row => headers.map(h => `"${row[h]}"`).join(","))
+    ...allData.map(row => headers.map(h => `"${row[h]}"`).join(","))
   ].join("\n");
 
   const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
   const link = document.createElement("a");
   link.href = URL.createObjectURL(blob);
-  link.download = "ordering_analysis_report.csv";
+  link.download = "stock_analysis_report.csv";
   link.click();
+}
+
+function openTab(tabId) {
+  document.querySelectorAll(".tab-button").forEach(btn => btn.classList.remove("active"));
+  document.querySelectorAll(".tab-content").forEach(tab => tab.classList.remove("active-tab"));
+
+  document.querySelector(`.tab-button[onclick*="${tabId}"]`).classList.add("active");
+  document.getElementById(tabId).classList.add("active-tab");
 }
