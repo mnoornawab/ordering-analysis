@@ -9,25 +9,25 @@ function processFile() {
     const data = new Uint8Array(e.target.result);
     const workbook = XLSX.read(data, { type: 'array' });
 
-    const sheetSIMA = workbook.Sheets['Quantity on Order - SIMA System'];
-    const sheetAllocation = workbook.Sheets['Allocation File'];
-    const sheetOrders = workbook.Sheets['Orders-SIMA System'];
+    const sheet1 = workbook.Sheets['Quantity on Order - SIMA System'];
+    const sheet2 = workbook.Sheets['Allocation File'];
+    const sheet3 = workbook.Sheets['Orders-SIMA System'];
 
-    if (!sheetSIMA || !sheetAllocation || !sheetOrders) {
+    if (!sheet1 || !sheet2 || !sheet3) {
       statusDiv.innerHTML = `<p style="color:red;">❌ One or more sheets not found.</p>`;
       return;
     }
 
-    const simaData = XLSX.utils.sheet_to_json(sheetSIMA, { defval: '' });
-    const allocData = XLSX.utils.sheet_to_json(sheetAllocation, { defval: '' });
-    const ordersData = XLSX.utils.sheet_to_json(sheetOrders, { defval: '' });
+    const simaData = XLSX.utils.sheet_to_json(sheet1, { defval: '' });
+    const allocData = XLSX.utils.sheet_to_json(sheet2, { defval: '' });
+    const ordersData = XLSX.utils.sheet_to_json(sheet3, { defval: '' });
 
     const itemMap = {};
 
-    // STEP 1: Load base SIMA file
+    // STEP 1: Load SIMA base file
     simaData.forEach(row => {
       const itemCode = row['Item Code']?.toString().trim();
-      const styleCode = row['Style Code']?.toString().trim(); // 🟢 From Column G
+      const styleCode = row['Style Code']?.toString().trim(); // ✅ Must be "Style Code"
       const qtyOnOrder = parseInt(row['Qty On Order']) || 0;
 
       if (itemCode) {
@@ -41,19 +41,19 @@ function processFile() {
       }
     });
 
-    // STEP 2: Match Allocation File by Style Code
+    // STEP 2: Match Allocation File by style code
     allocData.forEach(row => {
       const allocStyle = row['Material code']?.toString().trim();
       const allocQty = parseInt(row['Pending order qty']) || 0;
 
-      for (const code in itemMap) {
-        if (itemMap[code].styleCode === allocStyle) {
-          itemMap[code].qtyAllocated += allocQty;
+      Object.values(itemMap).forEach(entry => {
+        if (entry.styleCode === allocStyle) {
+          entry.qtyAllocated += allocQty;
         }
-      }
+      });
     });
 
-    // STEP 3: Match Orders-SIMA File by Item Code
+    // STEP 3: Match Orders by item code
     ordersData.forEach(row => {
       const itemCode = row['ITEMCODE']?.toString().trim();
       const balance = parseInt(row['BALANCE']) || 0;
@@ -64,14 +64,8 @@ function processFile() {
     });
 
     const finalData = Object.values(itemMap);
-
-    // Pass to render script
-    window.processedData = finalData;
     document.getElementById('main-report').innerHTML = generateMainTable(finalData);
-    document.getElementById('mismatch-report').innerHTML = generateMismatchTable(finalData);
-    document.getElementById('to-order-report').innerHTML = generateToOrderTable(finalData);
-
-    statusDiv.innerHTML = `<p style="color:green;">✅ File processed successfully.</p>`;
+    statusDiv.innerHTML = `<p style="color:green;">✅ File loaded successfully</p>`;
   };
 
   reader.readAsArrayBuffer(file);
