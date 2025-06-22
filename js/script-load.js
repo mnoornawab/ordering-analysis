@@ -1,71 +1,60 @@
 function processFile() {
-  const fileInput = document.getElementById("file-input");
+  const fileInput = document.getElementById('file-input');
   const file = fileInput.files[0];
-  const statusDiv = document.getElementById("status");
   if (!file) return;
 
   const reader = new FileReader();
-  reader.onload = (e) => {
+  reader.onload = function (e) {
     const data = new Uint8Array(e.target.result);
-    const workbook = XLSX.read(data, { type: "array" });
+    const workbook = XLSX.read(data, { type: 'array' });
 
-    const sheet1 = workbook.Sheets["Quantity on Order - SIMA System"];
-    const sheet2 = workbook.Sheets["Allocation File"];
-    const sheet3 = workbook.Sheets["Orders-SIMA System"];
+    const sheet1 = workbook.Sheets['Quantity on Order - SIMA System'];
+    const sheet2 = workbook.Sheets['Allocation File'];
+    const sheet3 = workbook.Sheets['Orders-SIMA System'];
 
-    if (!sheet1 || !sheet2 || !sheet3) {
-      statusDiv.innerHTML = `<p style="color:red;">❌ One or more sheets not found in the Excel file.</p>`;
-      return;
-    }
+    const data1 = XLSX.utils.sheet_to_json(sheet1, { defval: '' });
+    const data2 = XLSX.utils.sheet_to_json(sheet2, { defval: '' });
+    const data3 = XLSX.utils.sheet_to_json(sheet3, { defval: '' });
 
-    const simaData = XLSX.utils.sheet_to_json(sheet1, { defval: "" });
-    const allocData = XLSX.utils.sheet_to_json(sheet2, { defval: "" });
-    const ordersData = XLSX.utils.sheet_to_json(sheet3, { defval: "" });
-
-    const itemMap = {};
-
-    // STEP 1: Load Sheet 1 - Quantity on Order - SIMA System
-    simaData.forEach((row) => {
-      const itemCode = row["Item Code"]?.toString().trim();
-      const styleCode = row["Style Code"]?.toString().trim();
-      const qtyOnOrder = parseInt(row["Qty On Order"]) || 0;
-
+    const allocationSums = {};
+    data2.forEach(row => {
+      const itemCode = String(row['Item Code']).trim();
+      const qty = parseInt(row['Pending Order Qty']) || 0;
       if (itemCode) {
-        itemMap[itemCode] = {
-          itemCode,
-          styleCode,
-          qtyOnOrder,
-          qtyAllocated: 0,
-          balanceOrders: 0,
-        };
+        allocationSums[itemCode] = (allocationSums[itemCode] || 0) + qty;
       }
     });
 
-    // STEP 2: Match by Style Code in Allocation File
-    allocData.forEach((row) => {
-      const styleCode = row["Material code"]?.toString().trim();
-      const allocQty = parseInt(row["Pending order qty"]) || 0;
-
-      for (const item of Object.values(itemMap)) {
-        if (item.styleCode === styleCode) {
-          item.qtyAllocated += allocQty;
-        }
+    const ordersSums = {};
+    data3.forEach(row => {
+      const itemCode = String(row['Item Code']).trim();
+      const balance = parseInt(row['BALANCE']) || 0;
+      if (itemCode) {
+        ordersSums[itemCode] = (ordersSums[itemCode] || 0) + balance;
       }
     });
 
-    // STEP 3: Match by Item Code in Orders Sheet
-    ordersData.forEach((row) => {
-      const itemCode = row["ITEMCODE"]?.toString().trim();
-      const balance = parseInt(row["BALANCE"]) || 0;
+    const finalData = data1.map(row => {
+      const itemCode = String(row['Item Code']).trim();
+      const styleCode = row['Style'] || '';
+      const qtyOnOrder = parseInt(row['Qty On Order']) || 0;
 
-      if (itemMap[itemCode]) {
-        itemMap[itemCode].balanceOrders += balance;
-      }
+      return {
+        itemCode,
+        styleCode,
+        qtyOnOrder,
+        qtyAllocated: allocationSums[itemCode] || 0,
+        balanceOrders: ordersSums[itemCode] || 0
+      };
     });
 
-    const finalData = Object.values(itemMap);
-    document.getElementById("main-report").innerHTML = generateMainTable(finalData);
-    statusDiv.innerHTML = `<p style="color:green;">✅ File processed successfully.</p>`;
+    // Send data to renderer
+    renderMainReport(finalData);
+    renderMismatchReport(finalData);
+    renderToOrderReport(finalData);
+
+    document.getElementById('download-btn').style.display = 'block';
+    document.getElementById('status').innerHTML = '<p style="color:green;">✅ File uploaded and analyzed.</p>';
   };
 
   reader.readAsArrayBuffer(file);
