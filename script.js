@@ -15,7 +15,6 @@ function processFile() {
     const allocationSheet = XLSX.utils.sheet_to_json(workbook.Sheets["Allocation File"]);
     const ordersSheet = XLSX.utils.sheet_to_json(workbook.Sheets["Orders-SIMA System"]);
 
-    // Step 1: Load SIMA as base
     const simaMap = {};
     simaSheet.forEach(row => {
       const code = String(row["Item Code"]).trim();
@@ -27,7 +26,6 @@ function processFile() {
       };
     });
 
-    // Step 2: Merge allocation quantities
     const allocationTotals = {};
     allocationSheet.forEach(row => {
       const code = String(row["Material Code"]).trim();
@@ -36,7 +34,6 @@ function processFile() {
       allocationTotals[code] += qty;
     });
 
-    // Step 3: Merge orders balances
     const ordersTotals = {};
     ordersSheet.forEach(row => {
       const code = String(row["ITEMCODE"]).trim();
@@ -45,7 +42,6 @@ function processFile() {
       ordersTotals[code] += balance;
     });
 
-    // Step 4: Merge all into result array
     const results = Object.keys(simaMap).map(code => {
       return {
         "Item Code": code,
@@ -71,7 +67,15 @@ function displayTable(data) {
     return;
   }
 
+  const checkbox = document.createElement("label");
+  checkbox.innerHTML = `
+    <input type="checkbox" id="hide-zero" onchange="filterTable()"> Hide rows with all 0 values
+  `;
+  container.appendChild(checkbox);
+
   const table = document.createElement("table");
+  table.id = "results-table";
+
   const thead = document.createElement("thead");
   const tbody = document.createElement("tbody");
 
@@ -84,17 +88,51 @@ function displayTable(data) {
   });
   thead.appendChild(headerRow);
 
+  let totalOrder = 0, totalAlloc = 0, totalBalance = 0;
+
   data.forEach(row => {
     const tr = document.createElement("tr");
+    tr.classList.add("data-row");
+
+    let rowSum = 0;
     headers.forEach(h => {
       const td = document.createElement("td");
       td.innerText = row[h];
       tr.appendChild(td);
+
+      if (h === "Qty On Order") totalOrder += row[h];
+      if (h === "On Allocation File") totalAlloc += row[h];
+      if (h === "Balance from Orders") totalBalance += row[h];
+      if (["Qty On Order", "On Allocation File", "Balance from Orders"].includes(h)) {
+        rowSum += row[h];
+      }
     });
+
+    if (rowSum === 0) tr.classList.add("all-zero");
     tbody.appendChild(tr);
   });
+
+  // Totals row
+  const totalRow = document.createElement("tr");
+  headers.forEach(h => {
+    const td = document.createElement("td");
+    if (h === "Style Code") td.innerText = "TOTAL";
+    else if (h === "Qty On Order") td.innerText = totalOrder;
+    else if (h === "On Allocation File") td.innerText = totalAlloc;
+    else if (h === "Balance from Orders") td.innerText = totalBalance;
+    else td.innerText = "";
+    totalRow.appendChild(td);
+  });
+  tbody.appendChild(totalRow);
 
   table.appendChild(thead);
   table.appendChild(tbody);
   container.appendChild(table);
+}
+
+function filterTable() {
+  const hide = document.getElementById("hide-zero").checked;
+  document.querySelectorAll(".data-row").forEach(row => {
+    row.style.display = (hide && row.classList.contains("all-zero")) ? "none" : "";
+  });
 }
