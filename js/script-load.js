@@ -19,13 +19,13 @@ function processFile() {
 
     const itemMap = {};
 
-    // Step 1: Load SIMA Sheet (base)
+    // STEP 1: Load base data from SIMA system
     simaData.forEach(row => {
       const itemCode = row['Item Code']?.toString().trim();
       const styleCode = row['Material Code']?.toString().trim();
       const qtyOnOrder = parseInt(row['Qty On Order']) || 0;
 
-      if (itemCode && itemCode !== 'undefined') {
+      if (itemCode && styleCode) {
         itemMap[itemCode] = {
           itemCode,
           styleCode,
@@ -36,31 +36,31 @@ function processFile() {
       }
     });
 
-    // Step 2: Merge Allocation File (by Material code = styleCode)
+    // STEP 2: Match Allocation File using "Material code" vs styleCode
     allocData.forEach(row => {
-      const styleCode = row['Material code']?.toString().trim();
-      const qty = parseInt(row['Pending order qty']) || 0;
+      const allocStyleCode = row['Material code']?.toString().trim();
+      const pendingQty = parseInt(row['Pending order qty']) || 0;
 
-      for (const code in itemMap) {
-        if (itemMap[code].styleCode === styleCode) {
-          itemMap[code].qtyAllocated += qty;
+      Object.values(itemMap).forEach(item => {
+        if (item.styleCode === allocStyleCode) {
+          item.qtyAllocated += pendingQty;
         }
-      }
+      });
     });
 
-    // Step 3: Merge Balance from Orders File (match by ITEMCODE)
+    // STEP 3: Match BALANCE from Orders file using ITEMCODE
     ordersData.forEach(row => {
-      const itemCode = row['ITEMCODE']?.toString().trim();
+      const orderItemCode = row['ITEMCODE']?.toString().trim();
       const balance = parseInt(row['BALANCE']) || 0;
 
-      if (itemMap[itemCode]) {
-        itemMap[itemCode].balanceOrders += balance;
+      if (itemMap[orderItemCode]) {
+        itemMap[orderItemCode].balanceOrders += balance;
       }
     });
 
     const finalData = Object.values(itemMap);
 
-    // Render
+    // Render tables
     document.getElementById('main-report').innerHTML = generateMainTable(finalData);
     document.getElementById('mismatch-report').innerHTML = generateMismatchTable(finalData);
     statusDiv.innerHTML = `<p style="color:green;">✅ File processed successfully.</p>`;
