@@ -28,20 +28,20 @@ function processFile() {
 
     const itemMap = {};
 
-    // Extract from SIMA sheet
+    // Step 1: Load SIMA sheet
     simaData.forEach(row => {
       const keys = Object.keys(row).reduce((acc, k) => {
         acc[normalizeKey(k)] = k;
         return acc;
       }, {});
       const itemCode = row[keys['item code']]?.toString().trim();
-      const styleCode = row[keys['material code']]?.toString().trim();
+      const styleCode = row[keys['material code']]?.toString().trim(); // Style Code = Material Code
       const qtyOnOrder = parseInt(row[keys['qty on order']]) || 0;
 
-      if (itemCode && itemCode !== 'undefined') {
+      if (itemCode) {
         itemMap[itemCode] = {
           itemCode,
-          styleCode,
+          styleCode: styleCode || '', // fallback empty
           qtyOnOrder,
           qtyAllocated: 0,
           balanceOrders: 0,
@@ -49,7 +49,7 @@ function processFile() {
       }
     });
 
-    // Allocation File
+    // Step 2: Load Allocation File
     allocData.forEach(row => {
       const keys = Object.keys(row).reduce((acc, k) => {
         acc[normalizeKey(k)] = k;
@@ -63,7 +63,7 @@ function processFile() {
       }
     });
 
-    // Orders File
+    // Step 3: Load Orders File
     ordersData.forEach(row => {
       const keys = Object.keys(row).reduce((acc, k) => {
         acc[normalizeKey(k)] = k;
@@ -79,6 +79,7 @@ function processFile() {
 
     const finalData = Object.values(itemMap);
 
+    // Render
     document.getElementById('main-report').innerHTML = generateMainTable(finalData);
     document.getElementById('mismatch-report').innerHTML = generateMismatchTable(finalData);
     statusDiv.innerHTML = `<p style="color:green;">✅ File processed successfully.</p>`;
