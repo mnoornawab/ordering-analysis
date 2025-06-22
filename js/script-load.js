@@ -1,59 +1,70 @@
-// script-load.js
+function processFile() {
+  const fileInput = document.getElementById('file-input');
+  const file = fileInput.files[0];
+  const statusDiv = document.getElementById('status');
+  if (!file) return;
 
-async function handleFileUpload(event) {
-  const file = event.target.files[0];
   const reader = new FileReader();
-
-  reader.onload = async function (e) {
+  reader.onload = (e) => {
     const data = new Uint8Array(e.target.result);
     const workbook = XLSX.read(data, { type: 'array' });
 
-    const simaSheet = workbook.Sheets['Quantity on Order - SIMA System'];
-    const allocationSheet = workbook.Sheets['Allocation File'];
-    const ordersSheet = workbook.Sheets['Orders-SIMA System'];
+    const sheet1 = workbook.Sheets['Quantity on Order - SIMA System'];
+    const sheet2 = workbook.Sheets['Allocation File'];
+    const sheet3 = workbook.Sheets['Orders-SIMA System'];
 
-    const simaData = XLSX.utils.sheet_to_json(simaSheet, { defval: '' });
-    const allocationData = XLSX.utils.sheet_to_json(allocationSheet, { defval: '' });
-    const ordersData = XLSX.utils.sheet_to_json(ordersSheet, { defval: '' });
+    const simaData = XLSX.utils.sheet_to_json(sheet1, { defval: '' });
+    const allocData = XLSX.utils.sheet_to_json(sheet2, { defval: '' });
+    const ordersData = XLSX.utils.sheet_to_json(sheet3, { defval: '' });
 
-    const base = simaData.map(row => {
-      const itemCode = row['Item Code'] || row['ITEMCODE'] || row['ITEM CODE'] || row['itemcode'];
-      const styleCode = row['Material Code'] || row['STYLECODE'] || row['Style Code'];
-      const qtyOnOrder = Number(row['Qty On Order'] || row['QTY ON ORDER'] || row['Qty on Order'] || 0);
-      return { itemCode, styleCode, qtyOnOrder };
-    }).filter(item => item.itemCode);
+    const itemMap = {};
 
-    const allocations = {};
-    allocationData.forEach(row => {
-      const code = row['Material code'];
-      const qty = Number(row['Pending order qty'] || 0);
-      if (!allocations[code]) allocations[code] = 0;
-      allocations[code] += qty;
+    // Step 1: Load SIMA Sheet (base)
+    simaData.forEach(row => {
+      const itemCode = row['Item Code']?.toString().trim();
+      const styleCode = row['Material Code']?.toString().trim();
+      const qtyOnOrder = parseInt(row['Qty On Order']) || 0;
+
+      if (itemCode && itemCode !== 'undefined') {
+        itemMap[itemCode] = {
+          itemCode,
+          styleCode,
+          qtyOnOrder,
+          qtyAllocated: 0,
+          balanceOrders: 0
+        };
+      }
     });
 
-    const orderBalances = {};
+    // Step 2: Merge Allocation File (by Material code = styleCode)
+    allocData.forEach(row => {
+      const styleCode = row['Material code']?.toString().trim();
+      const qty = parseInt(row['Pending order qty']) || 0;
+
+      for (const code in itemMap) {
+        if (itemMap[code].styleCode === styleCode) {
+          itemMap[code].qtyAllocated += qty;
+        }
+      }
+    });
+
+    // Step 3: Merge Balance from Orders File (match by ITEMCODE)
     ordersData.forEach(row => {
-      const code = row['ITEMCODE'];
-      const balance = Number(row['BALANCE'] || 0);
-      if (!orderBalances[code]) orderBalances[code] = 0;
-      orderBalances[code] += balance;
+      const itemCode = row['ITEMCODE']?.toString().trim();
+      const balance = parseInt(row['BALANCE']) || 0;
+
+      if (itemMap[itemCode]) {
+        itemMap[itemCode].balanceOrders += balance;
+      }
     });
 
-    const merged = base.map(row => {
-      return {
-        itemCode: row.itemCode,
-        styleCode: row.styleCode,
-        qtyOnOrder: row.qtyOnOrder,
-        onAllocation: allocations[row.itemCode] || 0,
-        balanceFromOrders: orderBalances[row.itemCode] || 0,
-      };
-    });
+    const finalData = Object.values(itemMap);
 
-    window.stockData = merged;
-    renderFullReport(merged);
-    renderMismatchReport(merged);
+    // Render
+    document.getElementById('main-report').innerHTML = generateMainTable(finalData);
+    document.getElementById('mismatch-report').innerHTML = generateMismatchTable(finalData);
+    statusDiv.innerHTML = `<p style="color:green;">✅ File processed successfully.</p>`;
   };
 
   reader.readAsArrayBuffer(file);
 }
-
