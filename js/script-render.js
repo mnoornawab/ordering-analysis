@@ -1,22 +1,30 @@
 function downloadTemplate() {
     const templateSheets = {
         "Quantity on Order - SIMA System": [
-            ['Item Code', 'Style', 'Qty On Order'],
-            ['ABC123', '1234A', 100]
+            ['Item Code', 'Style', 'Qty on Order'],
+            ['ABC123', '1234A', 100],
+            ['DEF456', '2345B', 200]
         ],
         "Allocation File": [
             ['Item Code', 'Pending Order Qty'],
-            ['ABC123', 25]
+            ['ABC123', 90],
+            ['ABC123', 10],
+            ['DEF456', 180]
         ],
         "Orders-SIMA System": [
             ['Item Code', 'Style', 'BALANCE'],
-            ['ABC123', '1234A', 30]
+            ['ABC123', '1234A', 120],
+            ['DEF456', '2345B', 190],
+            ['DEF456', '2345B', 20]
         ]
     };
     exportToExcel(templateSheets, 'Stock_Order_Template.xlsx');
 }
 
 let analyzedData = [];
+let allocationMap = {};
+let ordersMap = {};
+let styleMap = {};
 
 function analyzeFile() {
     const fileInput = document.getElementById('excelFile');
@@ -31,60 +39,75 @@ function analyzeFile() {
         const data = new Uint8Array(e.target.result);
         const workbook = XLSX.read(data, { type: 'array' });
 
-        // Check for required sheets
-        const simaSheet = workbook.Sheets["Quantity on Order - SIMA System"];
-        const allocationSheet = workbook.Sheets["Allocation File"];
+        // ---- Load and normalize all sheets ----
+        const qtySheet = workbook.Sheets["Quantity on Order - SIMA System"];
+        const allocSheet = workbook.Sheets["Allocation File"];
         const ordersSheet = workbook.Sheets["Orders-SIMA System"];
-        if (!simaSheet || !allocationSheet || !ordersSheet) {
+        if (!qtySheet || !allocSheet || !ordersSheet) {
             alert("Excel file is missing required sheets. Please use the template.");
             return;
         }
 
-        const simaData = XLSX.utils.sheet_to_json(simaSheet);
-        const allocationData = XLSX.utils.sheet_to_json(allocationSheet);
+        const qtyData = XLSX.utils.sheet_to_json(qtySheet);
+        const allocData = XLSX.utils.sheet_to_json(allocSheet);
         const ordersData = XLSX.utils.sheet_to_json(ordersSheet);
 
-        // Build lookup maps for calculation
-        const allocationMap = {};
-        allocationData.forEach(row => {
-            const itemCode = row["Item Code"];
-            const qty = Number(row["Pending Order Qty"] || 0);
-            allocationMap[itemCode] = (allocationMap[itemCode] || 0) + qty;
+        // ---- Build Style Map from Qty on Order and Orders sheets ----
+        styleMap = {};
+        qtyData.forEach(row => {
+            if (row["Item Code"] && row["Style"]) {
+                styleMap[row["Item Code"]] = row["Style"];
+            }
         });
-
-        const ordersMap = {};
         ordersData.forEach(row => {
-            const itemCode = row["Item Code"];
-            const balance = Number(row["BALANCE"] || 0);
-            ordersMap[itemCode] = (ordersMap[itemCode] || 0) + balance;
+            if (row["Item Code"] && row["Style"] && !styleMap[row["Item Code"]]) {
+                styleMap[row["Item Code"]] = row["Style"];
+            }
         });
 
-        analyzedData = simaData.map(row => {
-            const itemCode = row["Item Code"];
-            const style = row["Style"];
-            const qtyOnOrder = Number(row["Qty On Order"] || 0);
-            const allocatedQty = allocationMap[itemCode] || 0;
-            const balanceOrder = ordersMap[itemCode] || 0;
-            const qtyToOrder = Math.max(allocatedQty - balanceOrder, 0);
+        // ---- Build Allocation Map (sum by Item Code) ----
+        allocationMap = {};
+        allocData.forEach(row => {
+            const item = row["Item Code"];
+            const qty = Number(row["Pending Order Qty"] || 0);
+            if (!item) return;
+            allocationMap[item] = (allocationMap[item] || 0) + qty;
+        });
 
+        // ---- Build Orders Map (sum by Item Code) ----
+        ordersMap = {};
+        ordersData.forEach(row => {
+            const item = row["Item Code"];
+            const qty = Number(row["BALANCE"] || 0);
+            if (!item) return;
+            ordersMap[item] = (ordersMap[item] || 0) + qty;
+        });
+
+        // ---- Build Main Data: All Item Codes from Qty on Order ----
+        analyzedData = qtyData.map(row => {
+            const item = row["Item Code"];
+            const style = styleMap[item] || "";
+            const qtyOnOrder = Number(row["Qty on Order"] || 0);
             return {
-                "Item Code": itemCode,
-                "Style": style,
-                "Qty On Order": qtyOnOrder,
-                "On Allocation File": allocatedQty,
-                "Balance from Orders": balanceOrder,
-                "Qty to Order": qtyToOrder
+                "Item Code": item,
+                "Style Code": style,
+                "Qty on Order": qtyOnOrder,
+                "On Allocation File": allocationMap[item] || 0,
+                "Balance from Orders": ordersMap[item] || 0
             };
         });
 
-        renderResults(analyzedData);
-        renderMismatch(analyzedData, allocationMap, ordersMap);
-        renderToOrder(analyzedData);
+        renderMainReport(analyzedData);
+        renderMismatchReport(analyzedData);
+        renderToOrderReport(analyzedData);
+
+        // Show main tab by default
+        switchTab('main');
     };
     reader.readAsArrayBuffer(file);
 }
 
-function renderResults(data) {
+function renderMainReport(data) {
     const container = document.getElementById("results");
     if (!data || data.length === 0) {
         container.innerHTML = "<p>No data found.</p>";
@@ -92,86 +115,71 @@ function renderResults(data) {
         return;
     }
 
-    const filtered = document.getElementById("filterCheckbox").checked
-        ? data.filter(row => row["Qty to Order"] > 0)
-        : data;
-
-    const table = document.createElement("table");
-    table.border = "1";
-    table.style.borderCollapse = "collapse";
-    table.style.width = "100%";
-
-    const thead = document.createElement("thead");
-    const headers = Object.keys(filtered[0]);
-    const headRow = document.createElement("tr");
-    headers.forEach(header => {
-        const th = document.createElement("th");
-        th.innerText = header;
-        th.style.padding = "5px";
-        headRow.appendChild(th);
+    const headers = ["Item Code", "Style Code", "Qty on Order", "On Allocation File", "Balance from Orders"];
+    let html = "<table><thead><tr>";
+    headers.forEach(h => html += `<th>${h}</th>`);
+    html += "</tr></thead><tbody>";
+    data.forEach(row => {
+        html += "<tr>";
+        headers.forEach(h => html += `<td>${row[h]}</td>`);
+        html += "</tr>";
     });
-    thead.appendChild(headRow);
-    table.appendChild(thead);
+    html += "</tbody></table>";
+    container.innerHTML = html;
 
-    const tbody = document.createElement("tbody");
-    filtered.forEach(row => {
-        const tr = document.createElement("tr");
-        headers.forEach(header => {
-            const td = document.createElement("td");
-            td.innerText = row[header];
-            td.style.padding = "5px";
-            tr.appendChild(td);
-        });
-        tbody.appendChild(tr);
-    });
-    table.appendChild(tbody);
-
-    container.innerHTML = "";
-    container.appendChild(table);
-
-    // Totals
-    const totalKeys = ["Qty On Order", "On Allocation File", "Balance from Orders", "Qty to Order"];
-    const totals = calculateTotals(filtered, totalKeys);
+    // Totals (sum only numeric columns)
+    const totalKeys = ["Qty on Order", "On Allocation File", "Balance from Orders"];
+    const totals = calculateTotals(data, totalKeys);
     const totalDiv = document.getElementById("totals");
     totalDiv.innerHTML = "Totals — " + totalKeys.map(k => k + ": " + totals[k]).join(" | ");
 }
 
-function renderMismatch(data, allocationMap, ordersMap) {
-    // Optional: Show mismatches between allocation and orders
-    const mismatches = data.filter(row => {
-        return row["On Allocation File"] !== row["Balance from Orders"];
-    });
+function renderMismatchReport(data) {
     const container = document.getElementById("mismatchResults");
+    // Show only rows where Qty on Order ≠ On Allocation File
+    const mismatches = data.filter(row => row["Qty on Order"] !== row["On Allocation File"]);
     if (mismatches.length === 0) {
         container.innerHTML = "<p>No mismatches found.</p>";
         return;
     }
+    const headers = ["Item Code", "Style Code", "Qty on Order", "On Allocation File", "Mismatch Note"];
     let html = "<table><thead><tr>";
-    Object.keys(mismatches[0]).forEach(h => html += `<th>${h}</th>`);
+    headers.forEach(h => html += `<th>${h}</th>`);
     html += "</tr></thead><tbody>";
     mismatches.forEach(row => {
+        let note = "";
+        if (row["Qty on Order"] !== row["On Allocation File"]) {
+            note = `Qty on Order (${row["Qty on Order"]}) ≠ On Allocation File (${row["On Allocation File"]})`;
+        }
         html += "<tr>";
-        Object.values(row).forEach(val => html += `<td>${val}</td>`);
+        headers.forEach(h => {
+            if (h === "Mismatch Note") {
+                html += `<td>${note}</td>`;
+            } else {
+                html += `<td>${row[h]}</td>`;
+            }
+        });
         html += "</tr>";
     });
     html += "</tbody></table>";
     container.innerHTML = html;
 }
 
-function renderToOrder(data) {
-    // Show rows where Qty to Order > 0
-    const filtered = data.filter(row => row["Qty to Order"] > 0);
+function renderToOrderReport(data) {
     const container = document.getElementById("toOrderResults");
+    // Show only rows where Balance from Orders > On Allocation File
+    const filtered = data.filter(row => row["Balance from Orders"] > row["On Allocation File"]);
     if (filtered.length === 0) {
         container.innerHTML = "<p>No items to order.</p>";
         return;
     }
+    const headers = ["Item Code", "Style Code", "On Allocation File", "Balance from Orders"];
     let html = "<table><thead><tr>";
-    Object.keys(filtered[0]).forEach(h => html += `<th>${h}</th>`);
+    headers.forEach(h => html += `<th>${h}</th>`);
     html += "</tr></thead><tbody>";
     filtered.forEach(row => {
         html += "<tr>";
-        Object.values(row).forEach(val => html += `<td>${val}</td>`);
+        headers.forEach(h => html += `<td>${row[h]}</td>`);
         html += "</tr>";
     });
     html += "</tbody></table>";
@@ -183,13 +191,10 @@ function exportResults() {
         alert("Please analyze a file first.");
         return;
     }
-    const filtered = document.getElementById("filterCheckbox").checked
-        ? analyzedData.filter(row => row["Qty to Order"] > 0)
-        : analyzedData;
-    const ws = XLSX.utils.json_to_sheet(filtered);
+    const ws = XLSX.utils.json_to_sheet(analyzedData);
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Report");
-    XLSX.writeFile(wb, "Stock_Order_Report.xlsx");
+    XLSX.utils.book_append_sheet(wb, ws, "Main Report");
+    XLSX.writeFile(wb, "Stock_Order_Main_Report.xlsx");
 }
 
 function calculateTotals(data, keys) {
