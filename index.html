@@ -14,45 +14,11 @@
     <button onclick="processFile()">Upload & Analyze</button>
     <div id="status"></div>
 
-    <div class="tabs">
-      <button class="tab-button active" onclick="openTab('main')">Main Report</button>
-      <button class="tab-button" onclick="openTab('mismatch')">Mismatch Report</button>
-      <button class="tab-button" onclick="openTab('to-order')">To Order Report</button>
-    </div>
-
-    <div id="main" class="tab-content active-tab">
-      <h3>📄 Main Report: Overview of All Items</h3>
-      <div id="main-report"></div>
-    </div>
-
-    <div id="mismatch" class="tab-content">
-      <h3>📄 Mismatch Report: SIMA vs Allocation</h3>
-      <div id="mismatch-report"></div>
-    </div>
-
-    <div id="to-order" class="tab-content">
-      <h3>📄 To Order Report: Outstanding Items</h3>
-      <div id="to-order-report"></div>
-    </div>
+    <div id="main-report"></div>
   </div>
 
   <script src="libs/xlsx.full.min.js"></script>
   <script src="js/script-load.js"></script>
   <script src="js/script-render.js"></script>
-
-  <script>
-    function openTab(tabName) {
-      const tabs = document.getElementsByClassName('tab-content');
-      const buttons = document.getElementsByClassName('tab-button');
-
-      for (let i = 0; i < tabs.length; i++) {
-        tabs[i].classList.remove('active-tab');
-        buttons[i].classList.remove('active');
-      }
-
-      document.getElementById(tabName).classList.add('active-tab');
-      event.currentTarget.classList.add('active');
-    }
-  </script>
 </body>
 </html>
