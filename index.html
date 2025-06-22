@@ -4,7 +4,6 @@
   <meta charset="UTF-8">
   <title>Stock Ordering App</title>
   <link rel="stylesheet" href="style.css">
-  <!-- Use the real SheetJS library from CDN -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <script src="js/script-utils.js"></script>
   <script src="js/script-render.js"></script>
@@ -12,38 +11,45 @@
 <body>
   <div class="container">
     <h1>Stock Ordering System</h1>
-    <div style="padding: 1rem; border-bottom: 1px solid #ccc; margin-bottom: 1rem;">
+    <div class="card">
       <h2>Download Template</h2>
       <p>This will download the official Excel template with correct sheet names and column structure.</p>
-      <button onclick="downloadTemplate()">Download Excel Template</button>
+      <button class="primary" onclick="downloadTemplate()">Download Excel Template</button>
     </div>
 
-    <div style="padding: 1rem;">
+    <div class="card">
       <h2>Upload File</h2>
       <input type="file" id="excelFile" accept=".xlsx" />
-      <button onclick="analyzeFile()">Analyze</button>
+      <button class="primary" onclick="analyzeFile()">Analyze</button>
       <br><br>
-      <label><input type="checkbox" id="filterCheckbox" onchange="renderResults(analyzedData)"> Show only rows where Qty to Order &gt; 0</label>
-      <br><br>
-      <button onclick="exportResults()">Download Report as Excel</button>
+      <label>
+        <input type="checkbox" id="filterCheckbox" onchange="renderMainReport(analyzedData)">
+        Show only rows where Balance from Orders &gt; On Allocation File
+      </label>
+      <div class="export-buttons">
+        <button onclick="exportReport('main')">Download Main Report</button>
+        <button onclick="exportReport('mismatch')">Download Mismatch Report</button>
+        <button onclick="exportReport('toorder')">Download To Order Report</button>
+        <button onclick="exportAllReports()">Download All Reports (Excel)</button>
+      </div>
     </div>
 
-    <div style="padding: 1rem;">
-      <div class="tabs">
-        <button class="tab-button active" onclick="switchTab('main')">Main Report</button>
-        <button class="tab-button" onclick="switchTab('mismatch')">Mismatch Report</button>
-        <button class="tab-button" onclick="switchTab('toorder')">To Order Report</button>
-      </div>
-      <div id="main" class="tab-content active-tab">
-        <div id="results"></div>
-        <div id="totals" style="margin-top:10px;font-weight:bold;"></div>
-      </div>
-      <div id="mismatch" class="tab-content">
-        <div id="mismatchResults"></div>
-      </div>
-      <div id="toorder" class="tab-content">
-        <div id="toOrderResults"></div>
-      </div>
+    <div class="tabs">
+      <button class="tab-button active" onclick="switchTab('main')">Main Report</button>
+      <button class="tab-button" onclick="switchTab('mismatch')">Mismatch Report</button>
+      <button class="tab-button" onclick="switchTab('toorder')">To Order Report</button>
+    </div>
+    <div id="main" class="tab-content active-tab">
+      <div id="results"></div>
+      <div id="totals" class="totals-row"></div>
+    </div>
+    <div id="mismatch" class="tab-content">
+      <div id="mismatchResults"></div>
+      <div id="mismatchTotals" class="totals-row"></div>
+    </div>
+    <div id="toorder" class="tab-content">
+      <div id="toOrderResults"></div>
+      <div id="toOrderTotals" class="totals-row"></div>
     </div>
   </div>
 </body>
