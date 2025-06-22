@@ -1,7 +1,3 @@
-function normalizeKey(key) {
-  return key?.toString().trim().toLowerCase();
-}
-
 function processFile() {
   const fileInput = document.getElementById('file-input');
   const file = fileInput.files[0];
@@ -28,16 +24,16 @@ function processFile() {
 
     const itemMap = {};
 
-    // Sheet 1: Quantity on Order - SIMA System
+    // Load SIMA sheet
     simaData.forEach(row => {
       const itemCode = row['Item Code']?.toString().trim();
-      const styleCode = row['Style Code']?.toString().trim(); // confirmed header
+      const styleCode = row['Style Code']?.toString().trim();
       const qtyOnOrder = parseInt(row['Qty On Order']) || 0;
 
-      if (itemCode) {
+      if (itemCode && itemCode !== 'undefined') {
         itemMap[itemCode] = {
           itemCode,
-          styleCode: styleCode || '',
+          styleCode,
           qtyOnOrder,
           qtyAllocated: 0,
           balanceOrders: 0
@@ -45,20 +41,19 @@ function processFile() {
       }
     });
 
-    // Sheet 2: Allocation File
+    // Load Allocation File by Style Code
     allocData.forEach(row => {
-      const styleCode = row['Material code']?.toString().trim();
-      const qty = parseInt(row['Pending order qty']) || 0;
+      const styleCodeAlloc = row['Material code']?.toString().trim();
+      const qtyAlloc = parseInt(row['Pending order qty']) || 0;
 
-      // Find matching item by Style Code
       Object.values(itemMap).forEach(item => {
-        if (item.styleCode === styleCode) {
-          item.qtyAllocated += qty;
+        if (item.styleCode === styleCodeAlloc) {
+          item.qtyAllocated += qtyAlloc;
         }
       });
     });
 
-    // Sheet 3: Orders-SIMA System
+    // Load Orders sheet by Item Code
     ordersData.forEach(row => {
       const itemCode = row['ITEMCODE']?.toString().trim();
       const balance = parseInt(row['BALANCE']) || 0;
@@ -70,7 +65,10 @@ function processFile() {
 
     const finalData = Object.values(itemMap);
 
-    // Now call rendering functions
+    // Save for rendering
+    window.processedData = finalData;
+
+    // Render
     document.getElementById('main-report').innerHTML = generateMainTable(finalData);
     document.getElementById('mismatch-report').innerHTML = generateMismatchTable(finalData);
     document.getElementById('to-order-report').innerHTML = generateToOrderTable(finalData);
