@@ -9,12 +9,29 @@
 <body>
   <div class="container">
     <h1>📦 Stock Ordering System</h1>
+
     <input type="file" id="file-input" accept=".xlsx" />
-    <button onclick="processFile()">Analyze File</button>
+    <button onclick="processFile()">Upload & Analyze</button>
     <div id="status"></div>
-    <div id="results-container"></div>
-    <button id="download-btn" style="display:none;" onclick="downloadCSV()">Download Results</button>
+
+    <div class="tabs">
+      <button class="tab-button active" onclick="openTab('mismatch')">Mismatch Report</button>
+      <button class="tab-button" onclick="openTab('to-order')">To Order Report</button>
+    </div>
+
+    <div id="mismatch" class="tab-content active-tab">
+      <h3>📄 Mismatch Report: SIMA vs Allocation</h3>
+      <div id="mismatch-table"></div>
+    </div>
+
+    <div id="to-order" class="tab-content">
+      <h3>📄 To Order Report: Balance vs Allocation</h3>
+      <div id="order-table"></div>
+    </div>
+
+    <button id="download-btn" style="display:none;" onclick="downloadCSV()">Download CSV</button>
   </div>
+
   <script src="libs/xlsx.full.min.js"></script>
   <script src="script.js"></script>
 </body>
