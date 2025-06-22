@@ -1,0 +1,7 @@
+.debug-box {
+  padding: 10px;
+  background: #f9f9f9;
+  border: 1px solid #ccc;
+  margin-bottom: 20px;
+  font-family: monospace;
+}
