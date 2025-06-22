@@ -1,11 +1,12 @@
 body {
   font-family: Arial, sans-serif;
   padding: 2rem;
-  background: #f6f9fc;
+  background: #f7f9fc;
+  margin: 0;
 }
 
 .container {
-  max-width: 900px;
+  max-width: 1000px;
   margin: auto;
   background: white;
   padding: 2rem;
@@ -15,22 +16,73 @@ body {
 
 input, button {
   margin: 1rem 0;
-  padding: 10px;
+  padding: 10px 14px;
   font-size: 16px;
+  border-radius: 5px;
+  border: 1px solid #ccc;
+}
+
+button {
+  cursor: pointer;
+  background-color: #4CAF50;
+  color: white;
+  border: none;
+}
+
+button:hover {
+  background-color: #45a049;
+}
+
+.tabs {
+  margin-top: 20px;
+}
+
+.tab-button {
+  background-color: #e9ecef;
+  border: none;
+  padding: 10px 20px;
+  margin-right: 10px;
+  font-size: 16px;
+  cursor: pointer;
+  border-radius: 5px 5px 0 0;
+}
+
+.tab-button.active {
+  background-color: #dee2e6;
+  font-weight: bold;
+}
+
+.tab-content {
+  display: none;
+  padding: 20px 0;
+  border-top: 2px solid #ccc;
+}
+
+.tab-content.active-tab {
+  display: block;
 }
 
 table {
-  border-collapse: collapse;
   width: 100%;
-  margin-top: 2rem;
+  border-collapse: collapse;
+  margin-top: 1rem;
 }
 
 th, td {
   border: 1px solid #ddd;
   padding: 8px;
   font-size: 14px;
+  text-align: left;
 }
 
 th {
   background-color: #f2f2f2;
+}
+
+tr.highlight-missing {
+  background-color: #ffe6e6; /* light red */
+}
+
+tr.highlight-to-order {
+  background-color: #fff9cc; /* light yellow */
 }
