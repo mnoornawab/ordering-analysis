@@ -28,49 +28,40 @@ function processFile() {
 
     const itemMap = {};
 
-    // Step 1: Load SIMA sheet
+    // Sheet 1: Quantity on Order - SIMA System
     simaData.forEach(row => {
-      const keys = Object.keys(row).reduce((acc, k) => {
-        acc[normalizeKey(k)] = k;
-        return acc;
-      }, {});
-      const itemCode = row[keys['item code']]?.toString().trim();
-      const styleCode = row[keys['material code']]?.toString().trim(); // Style Code = Material Code
-      const qtyOnOrder = parseInt(row[keys['qty on order']]) || 0;
+      const itemCode = row['Item Code']?.toString().trim();
+      const styleCode = row['Style Code']?.toString().trim(); // confirmed header
+      const qtyOnOrder = parseInt(row['Qty On Order']) || 0;
 
       if (itemCode) {
         itemMap[itemCode] = {
           itemCode,
-          styleCode: styleCode || '', // fallback empty
+          styleCode: styleCode || '',
           qtyOnOrder,
           qtyAllocated: 0,
-          balanceOrders: 0,
+          balanceOrders: 0
         };
       }
     });
 
-    // Step 2: Load Allocation File
+    // Sheet 2: Allocation File
     allocData.forEach(row => {
-      const keys = Object.keys(row).reduce((acc, k) => {
-        acc[normalizeKey(k)] = k;
-        return acc;
-      }, {});
-      const itemCode = row[keys['material code']]?.toString().trim();
-      const qty = parseInt(row[keys['pending order qty']]) || 0;
+      const styleCode = row['Material code']?.toString().trim();
+      const qty = parseInt(row['Pending order qty']) || 0;
 
-      if (itemMap[itemCode]) {
-        itemMap[itemCode].qtyAllocated += qty;
-      }
+      // Find matching item by Style Code
+      Object.values(itemMap).forEach(item => {
+        if (item.styleCode === styleCode) {
+          item.qtyAllocated += qty;
+        }
+      });
     });
 
-    // Step 3: Load Orders File
+    // Sheet 3: Orders-SIMA System
     ordersData.forEach(row => {
-      const keys = Object.keys(row).reduce((acc, k) => {
-        acc[normalizeKey(k)] = k;
-        return acc;
-      }, {});
-      const itemCode = row[keys['itemcode']]?.toString().trim();
-      const balance = parseInt(row[keys['balance']]) || 0;
+      const itemCode = row['ITEMCODE']?.toString().trim();
+      const balance = parseInt(row['BALANCE']) || 0;
 
       if (itemMap[itemCode]) {
         itemMap[itemCode].balanceOrders += balance;
@@ -79,9 +70,11 @@ function processFile() {
 
     const finalData = Object.values(itemMap);
 
-    // Render
+    // Now call rendering functions
     document.getElementById('main-report').innerHTML = generateMainTable(finalData);
     document.getElementById('mismatch-report').innerHTML = generateMismatchTable(finalData);
+    document.getElementById('to-order-report').innerHTML = generateToOrderTable(finalData);
+
     statusDiv.innerHTML = `<p style="color:green;">✅ File processed successfully.</p>`;
   };
 
