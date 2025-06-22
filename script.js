@@ -1,5 +1,4 @@
 let finalResults = [];
-let sampleOnlyResults = [];
 
 function processFile() {
   const fileInput = document.getElementById("file-input");
@@ -43,23 +42,11 @@ function analyzeData(simaData, allocationData, ordersData) {
   });
 
   const allocationMap = {};
-  const sampleItems = new Set();
-
   allocationData.forEach(row => {
     const code = String(row["Material code"]).trim();
     const qty = Number(row["Pending order qty"] || 0);
-    const po = String(row["PO Reference"] || "").toLowerCase().trim();
-    if (!po) return;
-
-    if (!allocationMap[code]) allocationMap[code] = { qty: 0, po_refs: [] };
-    allocationMap[code].qty += qty;
-    if (!allocationMap[code].po_refs.includes(po)) {
-      allocationMap[code].po_refs.push(po);
-    }
-
-    if (po.includes("sample")) {
-      sampleItems.add(code);
-    }
+    if (!allocationMap[code]) allocationMap[code] = 0;
+    allocationMap[code] += qty;
   });
 
   const orderMap = {};
@@ -75,66 +62,40 @@ function analyzeData(simaData, allocationData, ordersData) {
   });
 
   finalResults = [];
-  sampleOnlyResults = [];
 
   Object.keys(orderMap).forEach(code => {
     const order = orderMap[code];
-    const allocation = allocationMap[code] || { qty: 0, po_refs: [] };
+    const allocationQty = allocationMap[code] || 0;
     const onOrder = simaMap[code] || 0;
-    const isSample = sampleItems.has(code);
 
-    const qtyToOrder = Math.max(0, order.balance - allocation.qty - onOrder);
+    const qtyToOrder = Math.max(0, order.balance - allocationQty - onOrder);
+    const comment = qtyToOrder > 0 ? "Needs to be ordered" : "OK or Already on Order";
 
-    const result = {
+    finalResults.push({
       "Item Code": code,
       "Total Ordered": order.total,
       "Reserved": order.reserved,
       "Confirmed": order.confirmed,
       "Balance": order.balance,
-      "Allocation Qty": allocation.qty,
-      "PO Refs": allocation.po_refs.join(", "),
+      "Allocation Qty": allocationQty,
       "On Order Qty": onOrder,
       "Qty to Order": qtyToOrder,
-      "Sample PO?": isSample ? "Yes" : "No",
-      "Comment": ""
-    };
-
-    if (isSample) {
-      result["Comment"] = "Sample PO – Check before ordering";
-      sampleOnlyResults.push(result);
-    } else if (qtyToOrder > 0) {
-      result["Comment"] = "Needs to be ordered";
-      finalResults.push(result);
-    } else {
-      result["Comment"] = "OK or Already on Order";
-      finalResults.push(result);
-    }
+      "Comment": comment
+    });
   });
 
-  displayResults(finalResults, sampleOnlyResults);
+  displayResults(finalResults);
 }
 
-function displayResults(normal, samples) {
+function displayResults(data) {
   const container = document.getElementById("results-container");
   container.innerHTML = "";
 
-  const resultTitle = document.createElement("h3");
-  resultTitle.innerText = "📋 Main Order Analysis";
-  container.appendChild(resultTitle);
-  container.appendChild(createTable(normal));
-
-  if (samples.length > 0) {
-    const sampleTitle = document.createElement("h3");
-    sampleTitle.innerText = "⚠️ Sample PO Items (Separate)";
-    container.appendChild(sampleTitle);
-    container.appendChild(createTable(samples, true));
+  if (!data.length) {
+    container.innerText = "No matching records.";
+    return;
   }
 
-  document.getElementById("status").innerText = `✅ Analysis complete. ${normal.length + samples.length} items processed.`;
-  document.getElementById("download-btn").style.display = "inline-block";
-}
-
-function createTable(data, isSample = false) {
   const table = document.createElement("table");
   const thead = document.createElement("thead");
   const tbody = document.createElement("tbody");
@@ -151,10 +112,6 @@ function createTable(data, isSample = false) {
   data.forEach(row => {
     const tr = document.createElement("tr");
 
-    // row coloring
-    if (row["Sample PO?"] === "Yes") {
-      tr.style.backgroundColor = "#fff8dc"; // light yellow
-    }
     if (row["Comment"] === "Needs to be ordered") {
       tr.style.backgroundColor = "#ffe6e6"; // light red
     }
@@ -169,15 +126,17 @@ function createTable(data, isSample = false) {
 
   table.appendChild(thead);
   table.appendChild(tbody);
-  return table;
+  container.appendChild(table);
+
+  document.getElementById("status").innerText = `✅ Found ${data.length} items.`;
+  document.getElementById("download-btn").style.display = "inline-block";
 }
 
 function downloadCSV() {
-  const allData = finalResults.concat(sampleOnlyResults);
-  const headers = Object.keys(allData[0]);
+  const headers = Object.keys(finalResults[0]);
   const csv = [
     headers.join(","),
-    ...allData.map(row => headers.map(h => `"${row[h]}"`).join(","))
+    ...finalResults.map(row => headers.map(h => `"${row[h]}"`).join(","))
   ].join("\n");
 
   const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
