@@ -19,6 +19,7 @@ function generateMainTable(data) {
       <td>${balanceOrders}</td>
     </tr>`;
 
+    // Always sum totals (we'll handle hide-zero display separately)
     totals.order += qtyOnOrder;
     totals.allocation += qtyAllocated;
     totals.balance += balanceOrders;
@@ -38,7 +39,7 @@ function generateMismatchTable(data) {
 
   data.forEach(row => {
     if (row.qtyOnOrder !== row.qtyAllocated) {
-      html += `<tr style="background:#fff0f0;">
+      html += `<tr style="background:#fff2f2;">
         <td>${row.itemCode}</td>
         <td>${row.styleCode}</td>
         <td>${row.qtyOnOrder}</td>
@@ -56,30 +57,29 @@ function generateMismatchTable(data) {
 
 function generateToOrderTable(data) {
   let html = `<table><thead><tr>
-    <th>Item Code</th><th>Style Code</th><th>Balance from Orders</th><th>Qty On Order</th><th>On Allocation File</th><th>Qty to Order</th>
+    <th>Item Code</th><th>Style Code</th><th>Balance from Orders</th><th>On Allocation File</th><th>Qty to Order</th>
   </tr></thead><tbody>`;
 
   let totalToOrder = 0;
 
   data.forEach(row => {
-    const totalAvailable = row.qtyOnOrder + row.qtyAllocated;
     const required = row.balanceOrders;
-    const toOrder = required - totalAvailable;
+    const available = row.qtyAllocated;
+    const toOrder = required - available;
 
     if (toOrder > 0) {
-      html += `<tr style="background:#fffbea;">
+      html += `<tr style="background:#fffde7;">
         <td>${row.itemCode}</td>
         <td>${row.styleCode}</td>
         <td>${required}</td>
-        <td>${row.qtyOnOrder}</td>
-        <td>${row.qtyAllocated}</td>
+        <td>${available}</td>
         <td>${toOrder}</td>
       </tr>`;
       totalToOrder += toOrder;
     }
   });
 
-  html += `<tr><th>Total</th><td></td><td></td><td></td><td></td><th>${totalToOrder}</th></tr>`;
+  html += `<tr><th>Total</th><td></td><td></td><td></td><th>${totalToOrder}</th></tr>`;
   html += `</tbody></table>`;
   return html;
 }
