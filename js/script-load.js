@@ -17,6 +17,11 @@ function processFile() {
     const sheetAllocation = workbook.Sheets['Allocation File'];
     const sheetOrders = workbook.Sheets['Orders-SIMA System'];
 
+    if (!sheetSIMA || !sheetAllocation || !sheetOrders) {
+      statusDiv.innerHTML = `<p style="color:red;">❌ One or more sheets not found.</p>`;
+      return;
+    }
+
     const simaData = XLSX.utils.sheet_to_json(sheetSIMA, { defval: '' });
     const allocData = XLSX.utils.sheet_to_json(sheetAllocation, { defval: '' });
     const ordersData = XLSX.utils.sheet_to_json(sheetOrders, { defval: '' });
@@ -29,7 +34,6 @@ function processFile() {
         acc[normalizeKey(k)] = k;
         return acc;
       }, {});
-
       const itemCode = row[keys['item code']]?.toString().trim();
       const styleCode = row[keys['material code']]?.toString().trim();
       const qtyOnOrder = parseInt(row[keys['qty on order']]) || 0;
@@ -45,13 +49,12 @@ function processFile() {
       }
     });
 
-    // Extract from Allocation sheet
+    // Allocation File
     allocData.forEach(row => {
       const keys = Object.keys(row).reduce((acc, k) => {
         acc[normalizeKey(k)] = k;
         return acc;
       }, {});
-
       const itemCode = row[keys['material code']]?.toString().trim();
       const qty = parseInt(row[keys['pending order qty']]) || 0;
 
@@ -60,27 +63,26 @@ function processFile() {
       }
     });
 
-    // Extract from Orders sheet
+    // Orders File
     ordersData.forEach(row => {
       const keys = Object.keys(row).reduce((acc, k) => {
         acc[normalizeKey(k)] = k;
         return acc;
       }, {});
-
       const itemCode = row[keys['itemcode']]?.toString().trim();
-      const qty = parseInt(row[keys['balance']]) || 0;
+      const balance = parseInt(row[keys['balance']]) || 0;
 
       if (itemMap[itemCode]) {
-        itemMap[itemCode].balanceOrders += qty;
+        itemMap[itemCode].balanceOrders += balance;
       }
     });
 
     const finalData = Object.values(itemMap);
 
-    // Send to renderer
     document.getElementById('main-report').innerHTML = generateMainTable(finalData);
     document.getElementById('mismatch-report').innerHTML = generateMismatchTable(finalData);
     statusDiv.innerHTML = `<p style="color:green;">✅ File processed successfully.</p>`;
   };
+
   reader.readAsArrayBuffer(file);
 }
