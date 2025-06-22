@@ -8,18 +8,17 @@ function generateMainTable(data) {
 
   data.forEach(row => {
     const { itemCode, styleCode, qtyOnOrder, qtyAllocated, balanceOrders } = row;
-    const isZeroRow = (qtyOnOrder === 0 && qtyAllocated === 0 && balanceOrders === 0);
-    const hideClass = isZeroRow ? 'zero-row' : '';
+    const isZero = qtyOnOrder === 0 && qtyAllocated === 0 && balanceOrders === 0;
+    const rowClass = isZero ? 'zero-row' : '';
 
-    html += `<tr class="${hideClass}">
+    html += `<tr class="${rowClass}">
       <td>${itemCode}</td>
-      <td>${styleCode}</td>
+      <td>${styleCode || '-'}</td>
       <td>${qtyOnOrder}</td>
       <td>${qtyAllocated}</td>
       <td>${balanceOrders}</td>
     </tr>`;
 
-    // Always sum totals (we'll handle hide-zero display separately)
     totals.order += qtyOnOrder;
     totals.allocation += qtyAllocated;
     totals.balance += balanceOrders;
@@ -35,22 +34,22 @@ function generateMismatchTable(data) {
     <th>Item Code</th><th>Style Code</th><th>Qty On Order</th><th>On Allocation File</th>
   </tr></thead><tbody>`;
 
-  let totalOrder = 0, totalAlloc = 0;
+  let mismatchOrder = 0, mismatchAlloc = 0;
 
   data.forEach(row => {
     if (row.qtyOnOrder !== row.qtyAllocated) {
-      html += `<tr style="background:#fff2f2;">
+      html += `<tr style="background-color:#fff3f3;">
         <td>${row.itemCode}</td>
-        <td>${row.styleCode}</td>
+        <td>${row.styleCode || '-'}</td>
         <td>${row.qtyOnOrder}</td>
         <td>${row.qtyAllocated}</td>
       </tr>`;
-      totalOrder += row.qtyOnOrder;
-      totalAlloc += row.qtyAllocated;
+      mismatchOrder += row.qtyOnOrder;
+      mismatchAlloc += row.qtyAllocated;
     }
   });
 
-  html += `<tr><th>Total</th><td></td><th>${totalOrder}</th><th>${totalAlloc}</th></tr>`;
+  html += `<tr><th>Total</th><td></td><th>${mismatchOrder}</th><th>${mismatchAlloc}</th></tr>`;
   html += `</tbody></table>`;
   return html;
 }
@@ -63,19 +62,16 @@ function generateToOrderTable(data) {
   let totalToOrder = 0;
 
   data.forEach(row => {
-    const required = row.balanceOrders;
-    const available = row.qtyAllocated;
-    const toOrder = required - available;
-
-    if (toOrder > 0) {
-      html += `<tr style="background:#fffde7;">
+    const needed = row.balanceOrders - row.qtyAllocated;
+    if (needed > 0) {
+      html += `<tr style="background-color:#fffbe6;">
         <td>${row.itemCode}</td>
-        <td>${row.styleCode}</td>
-        <td>${required}</td>
-        <td>${available}</td>
-        <td>${toOrder}</td>
+        <td>${row.styleCode || '-'}</td>
+        <td>${row.balanceOrders}</td>
+        <td>${row.qtyAllocated}</td>
+        <td>${needed}</td>
       </tr>`;
-      totalToOrder += toOrder;
+      totalToOrder += needed;
     }
   });
 
