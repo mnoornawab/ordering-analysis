@@ -4,7 +4,9 @@ function generateMainTable(data) {
     <th>Item Code</th><th>Style Code</th><th>Qty On Order</th><th>On Allocation File</th><th>Balance from Orders</th>
   </tr></thead><tbody>`;
 
-  let totals = { order: 0, allocation: 0, balance: 0 };
+  let totalOrder = 0;
+  let totalAlloc = 0;
+  let totalBalance = 0;
 
   data.forEach(row => {
     const { itemCode, styleCode, qtyOnOrder, qtyAllocated, balanceOrders } = row;
@@ -19,63 +21,12 @@ function generateMainTable(data) {
       <td>${balanceOrders}</td>
     </tr>`;
 
-    totals.order += qtyOnOrder;
-    totals.allocation += qtyAllocated;
-    totals.balance += balanceOrders;
+    totalOrder += qtyOnOrder;
+    totalAlloc += qtyAllocated;
+    totalBalance += balanceOrders;
   });
 
-  html += `<tr><th>Total</th><td></td><th>${totals.order}</th><th>${totals.allocation}</th><th>${totals.balance}</th></tr>`;
-  html += `</tbody></table>`;
-  return html;
-}
-
-function generateMismatchTable(data) {
-  let html = `<table><thead><tr>
-    <th>Item Code</th><th>Style Code</th><th>Qty On Order</th><th>On Allocation File</th>
-  </tr></thead><tbody>`;
-
-  let mismatchOrder = 0, mismatchAlloc = 0;
-
-  data.forEach(row => {
-    if (row.qtyOnOrder !== row.qtyAllocated) {
-      html += `<tr style="background-color:#fff3f3;">
-        <td>${row.itemCode}</td>
-        <td>${row.styleCode || '-'}</td>
-        <td>${row.qtyOnOrder}</td>
-        <td>${row.qtyAllocated}</td>
-      </tr>`;
-      mismatchOrder += row.qtyOnOrder;
-      mismatchAlloc += row.qtyAllocated;
-    }
-  });
-
-  html += `<tr><th>Total</th><td></td><th>${mismatchOrder}</th><th>${mismatchAlloc}</th></tr>`;
-  html += `</tbody></table>`;
-  return html;
-}
-
-function generateToOrderTable(data) {
-  let html = `<table><thead><tr>
-    <th>Item Code</th><th>Style Code</th><th>Balance from Orders</th><th>On Allocation File</th><th>Qty to Order</th>
-  </tr></thead><tbody>`;
-
-  let totalToOrder = 0;
-
-  data.forEach(row => {
-    const needed = row.balanceOrders - row.qtyAllocated;
-    if (needed > 0) {
-      html += `<tr style="background-color:#fffbe6;">
-        <td>${row.itemCode}</td>
-        <td>${row.styleCode || '-'}</td>
-        <td>${row.balanceOrders}</td>
-        <td>${row.qtyAllocated}</td>
-        <td>${needed}</td>
-      </tr>`;
-      totalToOrder += needed;
-    }
-  });
-
-  html += `<tr><th>Total</th><td></td><td></td><td></td><th>${totalToOrder}</th></tr>`;
+  html += `<tr><th>Total</th><td></td><th>${totalOrder}</th><th>${totalAlloc}</th><th>${totalBalance}</th></tr>`;
   html += `</tbody></table>`;
   return html;
 }
