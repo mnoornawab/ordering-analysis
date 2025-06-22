@@ -3,49 +3,46 @@
 <head>
   <meta charset="UTF-8">
   <title>Stock Ordering App</title>
+  <link rel="stylesheet" href="style.css">
   <script src="libs/xlsx.full.min.js"></script>
   <script src="js/script-utils.js"></script>
   <script src="js/script-render.js"></script>
-  <style>
-    body { font-family: Arial, sans-serif; }
-    .tab { display: inline-block; padding: 10px 15px; border: 1px solid #ccc; cursor: pointer; margin-right: 5px; }
-    .tab.active { background-color: #007BFF; color: white; }
-    .tab-content { display: none; margin-top: 20px; }
-    .tab-content.active { display: block; }
-    table th, table td { padding: 5px; border: 1px solid #ccc; }
-  </style>
 </head>
 <body>
-  <div style="padding: 1rem; border-bottom: 1px solid #ccc; margin-bottom: 1rem;">
-    <h2>Download Template</h2>
-    <p>This will download the official Excel template with correct sheet names and column structure.</p>
-    <button onclick="downloadTemplate()">Download Excel Template</button>
-  </div>
-
-  <div style="padding: 1rem;">
-    <h2>Upload File</h2>
-    <input type="file" id="excelFile" accept=".xlsx" />
-    <button onclick="analyzeFile()">Analyze</button>
-    <br><br>
-    <label><input type="checkbox" id="filterCheckbox" onchange="renderResults(analyzedData)"> Show only rows where Qty to Order > 0</label>
-    <br><br>
-    <button onclick="exportResults()">Download Report as Excel</button>
-  </div>
-
-  <div style="padding: 1rem;">
-    <div class="tab active" onclick="switchTab('main')">Main Report</div>
-    <div class="tab" onclick="switchTab('mismatch')">Mismatch Report</div>
-    <div class="tab" onclick="switchTab('toorder')">To Order Report</div>
-
-    <div id="main" class="tab-content active">
-      <div id="results"></div>
-      <div id="totals" style="margin-top:10px;font-weight:bold;"></div>
+  <div class="container">
+    <h1>Stock Ordering System</h1>
+    <div style="padding: 1rem; border-bottom: 1px solid #ccc; margin-bottom: 1rem;">
+      <h2>Download Template</h2>
+      <p>This will download the official Excel template with correct sheet names and column structure.</p>
+      <button onclick="downloadTemplate()">Download Excel Template</button>
     </div>
-    <div id="mismatch" class="tab-content">
-      <div id="mismatchResults"></div>
+
+    <div style="padding: 1rem;">
+      <h2>Upload File</h2>
+      <input type="file" id="excelFile" accept=".xlsx" />
+      <button onclick="analyzeFile()">Analyze</button>
+      <br><br>
+      <label><input type="checkbox" id="filterCheckbox" onchange="renderResults(analyzedData)"> Show only rows where Qty to Order &gt; 0</label>
+      <br><br>
+      <button onclick="exportResults()">Download Report as Excel</button>
     </div>
-    <div id="toorder" class="tab-content">
-      <div id="toOrderResults"></div>
+
+    <div style="padding: 1rem;">
+      <div class="tabs">
+        <button class="tab-button active" onclick="switchTab('main')">Main Report</button>
+        <button class="tab-button" onclick="switchTab('mismatch')">Mismatch Report</button>
+        <button class="tab-button" onclick="switchTab('toorder')">To Order Report</button>
+      </div>
+      <div id="main" class="tab-content active-tab">
+        <div id="results"></div>
+        <div id="totals" style="margin-top:10px;font-weight:bold;"></div>
+      </div>
+      <div id="mismatch" class="tab-content">
+        <div id="mismatchResults"></div>
+      </div>
+      <div id="toorder" class="tab-content">
+        <div id="toOrderResults"></div>
+      </div>
     </div>
   </div>
 </body>
