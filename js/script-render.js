@@ -1,3 +1,16 @@
+// Helper for robust, case-insensitive column lookup
+function getColumnValue(row, possibleHeaders) {
+    for (const header of possibleHeaders) {
+        if (header in row) return row[header];
+        for (const key in row) {
+            if (key.trim().toLowerCase() === header.trim().toLowerCase()) {
+                return row[key];
+            }
+        }
+    }
+    return undefined;
+}
+
 function downloadTemplate() {
     const templateSheets = {
         "Quantity on Order - SIMA System": [
@@ -25,18 +38,6 @@ let allocationMap = {};
 let ordersMap = {};
 let styleMap = {};
 
-function getColumnValue(row, possibleHeaders) {
-    for (const header of possibleHeaders) {
-        if (header in row) return row[header];
-        for (const key in row) {
-            if (key.trim().toLowerCase() === header.trim().toLowerCase()) {
-                return row[key];
-            }
-        }
-    }
-    return undefined;
-}
-
 function analyzeFile() {
     const fileInput = document.getElementById('excelFile');
     const file = fileInput.files[0];
@@ -50,7 +51,7 @@ function analyzeFile() {
         const data = new Uint8Array(e.target.result);
         const workbook = XLSX.read(data, { type: 'array' });
 
-        // ---- Load all sheets ----
+        // ---- Load and normalize all sheets ----
         const qtySheet = workbook.Sheets["Quantity on Order - SIMA System"];
         const allocSheet = workbook.Sheets["Allocation File"];
         const ordersSheet = workbook.Sheets["Orders-SIMA System"];
@@ -63,19 +64,20 @@ function analyzeFile() {
         const allocData = XLSX.utils.sheet_to_json(allocSheet);
         const ordersData = XLSX.utils.sheet_to_json(ordersSheet);
 
-        // ---- Style map ----
+        // ---- Build Style Map from Qty on Order and Orders sheets ----
         styleMap = {};
         qtyData.forEach(row => {
-            if (row["Item Code"] && row["Style"]) styleMap[row["Item Code"]] = row["Style"];
-            // Support "Style" and "Style Code"
-            if (row["Item Code"] && row["Style Code"]) styleMap[row["Item Code"]] = row["Style Code"];
+            const code = getColumnValue(row, ["Item Code"]);
+            const style = getColumnValue(row, ["Style", "Style Code"]);
+            if (code && style) styleMap[code] = style;
         });
         ordersData.forEach(row => {
-            if (row["Item Code"] && row["Style"] && !styleMap[row["Item Code"]]) styleMap[row["Item Code"]] = row["Style"];
-            if (row["Item Code"] && row["Style Code"] && !styleMap[row["Item Code"]]) styleMap[row["Item Code"]] = row["Style Code"];
+            const code = getColumnValue(row, ["Item Code"]);
+            const style = getColumnValue(row, ["Style", "Style Code"]);
+            if (code && style && !styleMap[code]) styleMap[code] = style;
         });
 
-        // ---- Allocation Map (sum by Item Code) ----
+        // ---- Build Allocation Map (sum by Item Code) ----
         allocationMap = {};
         allocData.forEach(row => {
             const item = getColumnValue(row, ["Item Code"]);
@@ -84,7 +86,7 @@ function analyzeFile() {
             allocationMap[item] = (allocationMap[item] || 0) + qty;
         });
 
-        // ---- Orders Map (sum by Item Code) ----
+        // ---- Build Orders Map (sum by Item Code) ----
         ordersMap = {};
         ordersData.forEach(row => {
             const item = getColumnValue(row, ["Item Code"]);
@@ -93,18 +95,18 @@ function analyzeFile() {
             ordersMap[item] = (ordersMap[item] || 0) + (qty || 0);
         });
 
-        // ---- All unique Item Codes (from Qty on Order and Allocation File) ----
+        // ---- Build set of all Item Codes (union of Qty on Order and Allocation File) ----
         const allItemCodes = new Set();
         qtyData.forEach(row => { const code = getColumnValue(row, ["Item Code"]); if (code) allItemCodes.add(code); });
         allocData.forEach(row => { const code = getColumnValue(row, ["Item Code"]); if (code) allItemCodes.add(code); });
 
-        // ---- Main Data ----
+        // ---- Build Main Data: All unique Item Codes ----
         analyzedData = Array.from(allItemCodes).map(item => {
             const qtyRow = qtyData.find(row => getColumnValue(row, ["Item Code"]) === item);
             const style = styleMap[item] || "";
             let qtyOnOrder = 0;
             if (qtyRow) {
-                qtyOnOrder = Number(getColumnValue(qtyRow, ["Qty on Order", "Qty On Order"]) || 0);
+                qtyOnOrder = Number(getColumnValue(qtyRow, ["Qty on Order", "Qty On Order", "Qty on order"]) || 0);
             }
             return {
                 "Item Code": item,
@@ -119,6 +121,7 @@ function analyzeFile() {
         renderMismatchReport(analyzedData);
         renderToOrderReport(analyzedData);
 
+        // Show main tab by default
         switchTab('main');
     };
     reader.readAsArrayBuffer(file);
@@ -157,7 +160,7 @@ function renderMainReport(data) {
 
 function renderMismatchReport(data) {
     const container = document.getElementById("mismatchResults");
-    // Only rows where Qty on Order ≠ On Allocation File
+    // Show only rows where Qty on Order ≠ On Allocation File
     const mismatches = data.filter(row => row["Qty on Order"] !== row["On Allocation File"]);
     if (mismatches.length === 0) {
         container.innerHTML = "<p>No mismatches found.</p>";
@@ -188,7 +191,7 @@ function renderMismatchReport(data) {
 
 function renderToOrderReport(data) {
     const container = document.getElementById("toOrderResults");
-    // Only rows where Balance from Orders > On Allocation File
+    // Show only rows where Balance from Orders > On Allocation File
     const filtered = data.filter(row => row["Balance from Orders"] > row["On Allocation File"]);
     if (filtered.length === 0) {
         container.innerHTML = "<p>No items to order.</p>";
