@@ -22,10 +22,9 @@
       <input type="file" id="excelFile" accept=".xlsx" />
       <button class="primary" onclick="analyzeFile()">Analyze</button>
       <br><br>
-      <label>
-        <input type="checkbox" id="filterCheckbox" onchange="renderMainReport(analyzedData)">
-        Show only rows where Balance from Orders &gt; On Allocation File
-      </label>
+      <label><input type="checkbox" id="filterQtyCheckbox" onchange="renderMainReport(analyzedData)"> Show only rows where Qty on Order &gt; 0</label>
+      <label><input type="checkbox" id="filterAllocCheckbox" onchange="renderMainReport(analyzedData)"> Show only rows where On Allocation File &gt; 0</label>
+      <label><input type="checkbox" id="filterOrdersCheckbox" onchange="renderMainReport(analyzedData)"> Show only rows where Balance from Orders &gt; 0</label>
       <div class="export-buttons">
         <button onclick="exportReport('main')">Download Main Report</button>
         <button onclick="exportReport('mismatch')">Download Mismatch Report</button>
