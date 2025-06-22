@@ -21,12 +21,12 @@
     </div>
 
     <div id="main" class="tab-content active-tab">
-      <h3>📊 Main Report</h3>
+      <h3>📋 Main Report</h3>
       <div id="main-report"></div>
     </div>
 
     <div id="mismatch" class="tab-content">
-      <h3>⚠️ Mismatch Report</h3>
+      <h3>❗ Mismatch Report</h3>
       <div id="mismatch-report"></div>
     </div>
 
@@ -34,22 +34,10 @@
       <h3>📦 To Order Report</h3>
       <div id="to-order-report"></div>
     </div>
-
-    <button id="download-btn" style="display:none;" onclick="downloadCSV()">Download CSV</button>
   </div>
 
   <script src="libs/xlsx.full.min.js"></script>
   <script src="js/script-load.js"></script>
   <script src="js/script-render.js"></script>
-  <script>
-    function openTab(tabId) {
-      const tabs = document.querySelectorAll('.tab-content');
-      const buttons = document.querySelectorAll('.tab-button');
-      tabs.forEach(t => t.classList.remove('active-tab'));
-      buttons.forEach(b => b.classList.remove('active'));
-      document.getElementById(tabId).classList.add('active-tab');
-      document.querySelector(`.tab-button[onclick="openTab('${tabId}')"]`).classList.add('active');
-    }
-  </script>
 </body>
 </html>
