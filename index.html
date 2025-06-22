@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Stock Ordering System</title>
   <link rel="stylesheet" href="style.css" />
 </head>
@@ -13,10 +14,24 @@
     <button onclick="processFile()">Upload & Analyze</button>
     <div id="status"></div>
 
-    <div id="report"></div>
+    <div class="tabs">
+      <button class="tab-button active" onclick="openTab('main-report')">📋 Full Report</button>
+      <button class="tab-button" onclick="openTab('mismatch-report')">⚠️ Mismatch Report</button>
+    </div>
+
+    <div id="main-report" class="tab-content active-tab"></div>
+    <div id="mismatch-report" class="tab-content"></div>
   </div>
 
   <script src="libs/xlsx.full.min.js"></script>
   <script src="script.js"></script>
+  <script>
+    function openTab(tabId) {
+      document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active-tab'));
+      document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
+      document.getElementById(tabId).classList.add('active-tab');
+      event.target.classList.add('active');
+    }
+  </script>
 </body>
 </html>
