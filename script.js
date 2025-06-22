@@ -38,49 +38,63 @@ function analyzeData(simaData, allocationData, ordersData) {
   const simaMap = {};
   simaData.forEach(row => {
     const code = String(row["Item Code"]).trim();
-    simaMap[code] = Number(row["Qty On Order"] || 0);
+    const qty = Number(row["Qty On Order"] || 0);
+    simaMap[code] = qty;
   });
 
   const allocationMap = {};
+  const samplePOs = {};
+
   allocationData.forEach(row => {
     const code = String(row["Material code"]).trim();
     const qty = Number(row["Pending order qty"] || 0);
-    if (!allocationMap[code]) allocationMap[code] = 0;
-    allocationMap[code] += qty;
+    const po = String(row["PO Reference"] || "").toLowerCase().trim();
+
+    if (!allocationMap[code]) allocationMap[code] = { total: 0, real: 0, sample: [] };
+    allocationMap[code].total += qty;
+
+    if (po.includes("sample")) {
+      allocationMap[code].sample.push({ po: po, qty: qty });
+      if (!samplePOs[code]) samplePOs[code] = [];
+      samplePOs[code].push(`${po} (${qty})`);
+    } else {
+      allocationMap[code].real += qty;
+    }
   });
 
-  const orderMap = {};
+  const ordersMap = {};
   ordersData.forEach(row => {
     const code = String(row["Item Code"]).trim();
-    if (!orderMap[code]) {
-      orderMap[code] = { total: 0, reserved: 0, confirmed: 0, balance: 0 };
+    if (!ordersMap[code]) {
+      ordersMap[code] = { total: 0, reserved: 0, confirmed: 0 };
     }
-    orderMap[code].total += Number(row["Total Qty Ordered"] || 0);
-    orderMap[code].reserved += Number(row["Reserved"] || 0);
-    orderMap[code].confirmed += Number(row["Confirmed"] || 0);
-    orderMap[code].balance += Number(row["Balance"] || 0);
+    ordersMap[code].total += Number(row["Total Qty Ordered"] || 0);
+    ordersMap[code].reserved += Number(row["Reserved"] || 0);
+    ordersMap[code].confirmed += Number(row["Confirmed"] || 0);
   });
 
   finalResults = [];
 
-  Object.keys(orderMap).forEach(code => {
-    const order = orderMap[code];
-    const allocationQty = allocationMap[code] || 0;
-    const onOrder = simaMap[code] || 0;
+  Object.keys(simaMap).forEach(code => {
+    const onOrderQty = simaMap[code] || 0;
+    const order = ordersMap[code] || { total: 0, reserved: 0, confirmed: 0 };
+    const allocation = allocationMap[code] || { total: 0, real: 0, sample: [] };
 
-    const qtyToOrder = Math.max(0, order.balance - allocationQty - onOrder);
-    const comment = qtyToOrder > 0 ? "Needs to be ordered" : "OK or Already on Order";
+    const balance = order.total - order.reserved - order.confirmed;
+    const qtyToOrder = Math.max(0, balance - onOrderQty - allocation.real);
+    const mismatch = onOrderQty !== allocation.total;
 
     finalResults.push({
       "Item Code": code,
       "Total Ordered": order.total,
       "Reserved": order.reserved,
       "Confirmed": order.confirmed,
-      "Balance": order.balance,
-      "Allocation Qty": allocationQty,
-      "On Order Qty": onOrder,
+      "Balance": balance,
+      "On Order (SIMA)": onOrderQty,
+      "Allocated Qty (Real)": allocation.real,
       "Qty to Order": qtyToOrder,
-      "Comment": comment
+      "Allocation Mismatch?": mismatch ? "⚠️ Yes" : "No",
+      "Sample PO Summary": (samplePOs[code] || []).join(", ")
     });
   });
 
@@ -112,8 +126,11 @@ function displayResults(data) {
   data.forEach(row => {
     const tr = document.createElement("tr");
 
-    if (row["Comment"] === "Needs to be ordered") {
-      tr.style.backgroundColor = "#ffe6e6"; // light red
+    // Highlight rules
+    if (row["Qty to Order"] > 0) {
+      tr.style.backgroundColor = "#ffe6e6"; // red
+    } else if (row["Allocation Mismatch?"] === "⚠️ Yes") {
+      tr.style.backgroundColor = "#fff3cd"; // yellow
     }
 
     headers.forEach(key => {
@@ -121,6 +138,7 @@ function displayResults(data) {
       td.innerText = row[key];
       tr.appendChild(td);
     });
+
     tbody.appendChild(tr);
   });
 
@@ -128,7 +146,7 @@ function displayResults(data) {
   table.appendChild(tbody);
   container.appendChild(table);
 
-  document.getElementById("status").innerText = `✅ Found ${data.length} items.`;
+  document.getElementById("status").innerText = `✅ Analysis complete. ${data.length} items processed.`;
   document.getElementById("download-btn").style.display = "inline-block";
 }
 
@@ -142,6 +160,6 @@ function downloadCSV() {
   const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
   const link = document.createElement("a");
   link.href = URL.createObjectURL(blob);
-  link.download = "ordering_report.csv";
+  link.download = "ordering_analysis_report.csv";
   link.click();
 }
